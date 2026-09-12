@@ -169,7 +169,13 @@ def test_providers_implement_protocol() -> None:
 
 @pytest.mark.parametrize(
     "preset",
-    ["deployment-regression", "database-outage", "resource-exhaustion"],
+    [
+        "deployment-regression",
+        "database-outage",
+        "resource-exhaustion",
+        "dependency-incompatibility",
+        "coincidental-deployment",
+    ],
 )
 @pytest.mark.asyncio
 async def test_fake_provider_all_presets_and_methods(

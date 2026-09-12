@@ -45,6 +45,8 @@ class FakeReasoningProvider:
     - 'deployment-regression': New code/config deployment caused operational regression.
     - 'database-outage': Database connection pool exhaustion / failure.
     - 'resource-exhaustion': Memory leak / container OOM kills.
+    - 'dependency-incompatibility': External library or upstream dependency version mismatch.
+    - 'coincidental-deployment': Deployment coincided with incident, but cause is independent external outage.
     """
 
     def __init__(
@@ -133,6 +135,40 @@ class FakeReasoningProvider:
                     resolved=False,
                 )
             ]
+        elif self.preset == "dependency-incompatibility":
+            known = [
+                KnownFact(
+                    statement=f"Service '{incident.service}' failed with dependency import or symbol resolution errors.",
+                    evidence_ids=evidence_ids[:1],
+                )
+            ]
+            missing = [
+                MissingInformationItem(
+                    information_id="need_dep_version",
+                    question="Which dependency or library version was updated recently?",
+                    reason="Identify incompatible transitive library upgrade.",
+                    priority=InformationPriority.HIGH,
+                    candidate_sources=[SourceType.PIPELINES, SourceType.CHANGES],
+                    resolved=False,
+                )
+            ]
+        elif self.preset == "coincidental-deployment":
+            known = [
+                KnownFact(
+                    statement=f"Deployment on '{incident.service}' coincided with external payment provider outage.",
+                    evidence_ids=evidence_ids[:1],
+                )
+            ]
+            missing = [
+                MissingInformationItem(
+                    information_id="need_ext_health",
+                    question="Is the external dependency or upstream provider down independently?",
+                    reason="Verify whether the coincident deployment is causal or merely temporal.",
+                    priority=InformationPriority.HIGH,
+                    candidate_sources=[SourceType.HEALTH, SourceType.LOGS],
+                    resolved=False,
+                )
+            ]
         else:  # default: deployment-regression
             known = [
                 KnownFact(
@@ -177,6 +213,11 @@ class FakeReasoningProvider:
             return self.custom_plan
 
         now_str = datetime.now(timezone.utc).isoformat()
+        incident_service = (
+            context.incident.service
+            if (context and context.incident and context.incident.service)
+            else "payment-api"
+        )
 
         if self.preset == "database-outage":
             queries = [
@@ -209,6 +250,35 @@ class FakeReasoningProvider:
                     expected_information_value=InformationValueLevel.HIGH,
                 )
             ]
+        elif self.preset == "dependency-incompatibility":
+            queries = [
+                EvidenceQueryPlanQuery(
+                    query_id="qry_dep_01",
+                    source_type=SourceType.CHANGES,
+                    question="What dependencies were modified in the build or package lockfiles?",
+                    parameters={
+                        "service": incident_service,
+                        "limit": 10,
+                    },
+                    related_information_ids=["need_dep_version"],
+                    discriminates_hypothesis_ids=["hyp_01", "hyp_02"],
+                    expected_information_value=InformationValueLevel.HIGH,
+                )
+            ]
+        elif self.preset == "coincidental-deployment":
+            queries = [
+                EvidenceQueryPlanQuery(
+                    query_id="qry_ext_health_01",
+                    source_type=SourceType.HEALTH,
+                    question="What is the availability status of the external payment gateway?",
+                    parameters={
+                        "service": "payment-gateway",
+                    },
+                    related_information_ids=["need_ext_health"],
+                    discriminates_hypothesis_ids=["hyp_01", "hyp_02"],
+                    expected_information_value=InformationValueLevel.HIGH,
+                )
+            ]
         else:  # deployment-regression
             queries = [
                 EvidenceQueryPlanQuery(
@@ -216,7 +286,7 @@ class FakeReasoningProvider:
                     source_type=SourceType.DEPLOYMENTS,
                     question="Which deployments completed shortly before the error increase?",
                     parameters={
-                        "service": "payment-api",
+                        "service": incident_service,
                         "limit": 10,
                     },
                     related_information_ids=["need_deploy_history"],
@@ -311,6 +381,70 @@ class FakeReasoningProvider:
                     contradicting_evidence=[],
                     missing_information_ids=[],
                     testable_prediction="Request rate metrics increased significantly before errors.",
+                    status=HypothesisStatus.ACTIVE,
+                ),
+            ]
+        elif self.preset == "dependency-incompatibility":
+            hypotheses = [
+                Hypothesis(
+                    hypothesis_id="hyp_01",
+                    incident_id=incident.incident_id,
+                    revision=1,
+                    statement="Incompatible transitive dependency update broke application runtime.",
+                    root_cause_category=RootCauseCategory.DEPENDENCY_INCOMPATIBILITY,
+                    affected_component=incident.service,
+                    supporting_evidence=[
+                        EvidenceCitation(evidence_id=eid, reason="Module resolution error logged.")
+                        for eid in evidence_ids[:1]
+                    ],
+                    contradicting_evidence=[],
+                    missing_information_ids=["need_dep_version"],
+                    testable_prediction="Dependency lockfile diff shows upgraded library version.",
+                    status=HypothesisStatus.ACTIVE,
+                ),
+                Hypothesis(
+                    hypothesis_id="hyp_02",
+                    incident_id=incident.incident_id,
+                    revision=1,
+                    statement="Hardware node failure affected container host.",
+                    root_cause_category=RootCauseCategory.INFRASTRUCTURE_FAILURE,
+                    affected_component="k8s-worker-node",
+                    supporting_evidence=[],
+                    contradicting_evidence=[],
+                    missing_information_ids=[],
+                    testable_prediction="Kubernetes node events show NodeNotReady.",
+                    status=HypothesisStatus.ACTIVE,
+                ),
+            ]
+        elif self.preset == "coincidental-deployment":
+            hypotheses = [
+                Hypothesis(
+                    hypothesis_id="hyp_01",
+                    incident_id=incident.incident_id,
+                    revision=1,
+                    statement="External third-party payment gateway suffered an independent service outage.",
+                    root_cause_category=RootCauseCategory.EXTERNAL_DEPENDENCY_FAILURE,
+                    affected_component="payment-gateway",
+                    supporting_evidence=[
+                        EvidenceCitation(evidence_id=eid, reason="External gateway timeouts reported.")
+                        for eid in evidence_ids[:1]
+                    ],
+                    contradicting_evidence=[],
+                    missing_information_ids=["need_ext_health"],
+                    testable_prediction="External status page confirms global gateway degradation.",
+                    status=HypothesisStatus.ACTIVE,
+                ),
+                Hypothesis(
+                    hypothesis_id="hyp_02",
+                    incident_id=incident.incident_id,
+                    revision=1,
+                    statement="Coincidental deployment introduced a regression in payment routing.",
+                    root_cause_category=RootCauseCategory.DEPLOYMENT_FAILURE,
+                    affected_component=incident.service,
+                    supporting_evidence=[],
+                    contradicting_evidence=[],
+                    missing_information_ids=[],
+                    testable_prediction="Rollback to previous deployment resolves errors.",
                     status=HypothesisStatus.ACTIVE,
                 ),
             ]
