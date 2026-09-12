@@ -74,7 +74,7 @@ class NormalizedTimestamps:
         return result
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, repr=False)
 class NormalizedEvidenceCandidate:
     """Canonical pre-security candidate; never a persistence DTO.
 
@@ -145,6 +145,13 @@ class NormalizedEvidenceCandidate:
         if self.resource is not None:
             result["resource"] = self.resource
         return result
+
+    def __repr__(self) -> str:
+        return (
+            "NormalizedEvidenceCandidate("
+            f"incident_id={self.incident_id!r}, batch_id={self.batch_id!r}, "
+            f"query_id={self.query_id!r})"
+        )
 
 
 @dataclass(frozen=True, slots=True)
