@@ -1,0 +1,8 @@
+{
+  "schema_version": "1.0",
+  "code": "time_uncertain",
+  "message": "Source time is approximate.",
+  "path": "results[0].records[1].event_time",
+  "record_id": "log-999",
+  "details": {"uncertainty_ms": 5000}
+}

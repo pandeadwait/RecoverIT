@@ -1,0 +1,7 @@
+{
+  "batch_id": "batch_009",
+  "query_id": "qry_101",
+  "source_record_id": "log-998",
+  "source_adapter": "fixture-log-adapter",
+  "raw_payload_hash": "sha256:76fd3e6c9706a7b0"
+}

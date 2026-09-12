@@ -1,0 +1,12 @@
+{
+  "schema_version": "2.0",
+  "evidence_id": "ev_201",
+  "incident_id": "inc_001",
+  "source_type": "logs",
+  "evidence_type": "error_event",
+  "collected_at": "2026-09-12T10:31:00Z",
+  "summary": "Invalid version fixture",
+  "attributes": {},
+  "provenance": {"batch_id": "batch_009", "query_id": "qry_101", "source_adapter": "fixture-log-adapter", "raw_payload_hash": "sha256:abc"},
+  "quality": {"reliability": "high", "truncated_source": false, "redactions_applied": false}
+}
