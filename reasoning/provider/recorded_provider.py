@@ -54,6 +54,11 @@ class RecordedReasoningProvider:
         if recordings is not None:
             self._recordings.update(recordings)
 
+    @classmethod
+    def from_file(cls, path: str | Path) -> RecordedReasoningProvider:
+        """Construct a RecordedReasoningProvider from a JSON fixture file."""
+        return cls(fixture_path=path)
+
     @property
     def call_count(self) -> int:
         """Total number of replayed calls."""

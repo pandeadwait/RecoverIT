@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "incident_id": "inc_deploy_reg_01",
+  "external_alert_id": "alt_deploy_101",
+  "service": "payment-api",
+  "environment": "production",
+  "severity": "critical",
+  "detected_at": "2026-09-12T10:00:00Z",
+  "received_at": "2026-09-12T10:01:00Z",
+  "summary": "HTTP 500 error spike on payment-api after deployment v2.4.1",
+  "labels": {
+    "tier": "1",
+    "team": "payments"
+  }
+}

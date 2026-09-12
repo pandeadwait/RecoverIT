@@ -1,0 +1,156 @@
+{
+  "assess_missing_information": {
+    "schema_version": "1.0",
+    "incident_id": "inc_deploy_reg_01",
+    "assessment_id": "mia_deploy_01",
+    "known_facts": [
+      {
+        "schema_version": "1.0",
+        "statement": "Deployment v2.4.1 finished right before errors started.",
+        "supporting_evidence_ids": ["ev_deploy_01"]
+      },
+      {
+        "schema_version": "1.0",
+        "statement": "Connection timeouts observed in payment-api logs.",
+        "supporting_evidence_ids": ["ev_log_01"]
+      }
+    ],
+    "missing_information": [
+      {
+        "schema_version": "1.0",
+        "information_id": "need_config_diff",
+        "question": "What configuration parameters were modified in deployment v2.4.1?",
+        "reason": "Confirms whether DB pool parameters were altered.",
+        "priority": "high",
+        "candidate_sources": ["configuration", "deployments"],
+        "resolved": false
+      }
+    ],
+    "unavailable_information": [],
+    "recommended_stop": false
+  },
+  "plan_queries": {
+    "schema_version": "1.0",
+    "incident_id": "inc_deploy_reg_01",
+    "plan_id": "plan_deploy_01",
+    "round": 1,
+    "queries": [
+      {
+        "schema_version": "1.0",
+        "query_id": "qry_config_01",
+        "source_type": "configuration",
+        "question": "Inspect configuration parameters for payment-api",
+        "parameters": {
+          "service": "payment-api",
+          "key": "db.pool"
+        },
+        "related_information_ids": ["need_config_diff"],
+        "discriminates_hypothesis_ids": ["hyp_deploy_01"],
+        "expected_information_value": "high"
+      }
+    ],
+    "stop_reason": null
+  },
+  "generate_hypotheses": {
+    "schema_version": "1.0",
+    "incident_id": "inc_deploy_reg_01",
+    "hypotheses": [
+      {
+        "schema_version": "1.0",
+        "hypothesis_id": "hyp_deploy_01",
+        "incident_id": "inc_deploy_reg_01",
+        "revision": 1,
+        "statement": "Deployment v2.4.1 introduced an invalid database connection pool sizing configuration.",
+        "root_cause_category": "configuration_regression",
+        "affected_component": "payment-api",
+        "supporting_evidence": [
+          {
+            "schema_version": "1.0",
+            "evidence_id": "ev_deploy_01",
+            "reason": "Deployment updated DB pool parameters"
+          },
+          {
+            "schema_version": "1.0",
+            "evidence_id": "ev_metric_01",
+            "reason": "Errors spiked immediately after deployment"
+          },
+          {
+            "schema_version": "1.0",
+            "evidence_id": "ev_log_01",
+            "reason": "JDBC connection pool timeouts in logs"
+          }
+        ],
+        "contradicting_evidence": [],
+        "missing_information_ids": [],
+        "testable_prediction": "Diff of deployment configuration contains modified DB pool settings.",
+        "status": "active"
+      },
+      {
+        "schema_version": "1.0",
+        "hypothesis_id": "hyp_deploy_02",
+        "incident_id": "inc_deploy_reg_01",
+        "revision": 1,
+        "statement": "External payment processor network route outage.",
+        "root_cause_category": "external_dependency_failure",
+        "affected_component": "payment-gateway",
+        "supporting_evidence": [],
+        "contradicting_evidence": [],
+        "missing_information_ids": [],
+        "testable_prediction": "Network ping to external gateway times out.",
+        "status": "active"
+      }
+    ],
+    "generated_at": "2026-09-12T10:05:00Z"
+  },
+  "revise_hypotheses": {
+    "schema_version": "1.0",
+    "incident_id": "inc_deploy_reg_01",
+    "hypotheses": [
+      {
+        "schema_version": "1.0",
+        "hypothesis_id": "hyp_deploy_01",
+        "incident_id": "inc_deploy_reg_01",
+        "revision": 2,
+        "statement": "Deployment v2.4.1 introduced an invalid database connection pool sizing configuration.",
+        "root_cause_category": "configuration_regression",
+        "affected_component": "payment-api",
+        "supporting_evidence": [
+          {
+            "schema_version": "1.0",
+            "evidence_id": "ev_deploy_01",
+            "reason": "Deployment updated DB pool parameters"
+          },
+          {
+            "schema_version": "1.0",
+            "evidence_id": "ev_metric_01",
+            "reason": "Errors spiked immediately after deployment"
+          },
+          {
+            "schema_version": "1.0",
+            "evidence_id": "ev_log_01",
+            "reason": "JDBC connection pool timeouts in logs"
+          }
+        ],
+        "contradicting_evidence": [],
+        "missing_information_ids": [],
+        "testable_prediction": "Diff of deployment configuration contains modified DB pool settings.",
+        "status": "active"
+      },
+      {
+        "schema_version": "1.0",
+        "hypothesis_id": "hyp_deploy_02",
+        "incident_id": "inc_deploy_reg_01",
+        "revision": 2,
+        "statement": "External payment processor network route outage.",
+        "root_cause_category": "external_dependency_failure",
+        "affected_component": "payment-gateway",
+        "supporting_evidence": [],
+        "contradicting_evidence": [],
+        "missing_information_ids": [],
+        "testable_prediction": "Network ping to external gateway times out.",
+        "status": "weakened"
+      }
+    ],
+    "generated_at": "2026-09-12T10:06:00Z"
+  }
+}

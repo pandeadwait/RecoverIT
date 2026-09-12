@@ -158,8 +158,10 @@ class InMemoryContextBuilder:
     def __init__(
         self,
         synthetic_evidence: list[EvidenceSummaryProjection] | None = None,
+        created_at: datetime | None = None,
     ) -> None:
         self.synthetic_evidence = synthetic_evidence or []
+        self.fixed_created_at = created_at
         self.built_snapshots: list[IncidentContextSnapshot] = []
 
     async def build(
@@ -196,11 +198,16 @@ class InMemoryContextBuilder:
                         )
 
         rev = (previous_context.revision + 1) if previous_context else 1
+        effective_created_at = (
+            previous_context.created_at
+            if previous_context
+            else (self.fixed_created_at or datetime.now(timezone.utc))
+        )
         snapshot = IncidentContextSnapshot(
             snapshot_id=f"ctx_{incident_id}_{rev}",
             incident_id=incident_id,
             revision=rev,
-            created_at=datetime.now(timezone.utc),
+            created_at=effective_created_at,
             incident=(
                 previous_context.incident
                 if previous_context
@@ -208,7 +215,7 @@ class InMemoryContextBuilder:
                     service="sample-service",
                     environment="production",
                     severity=Severity.CRITICAL,
-                    detected_at=datetime.now(timezone.utc),
+                    detected_at=effective_created_at,
                     summary="Incident summary",
                 )
             ),
