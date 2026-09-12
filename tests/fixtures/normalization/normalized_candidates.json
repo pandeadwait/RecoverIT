@@ -1,0 +1,78 @@
+[
+  {
+    "source_type": "changes",
+    "evidence_type": "source_change",
+    "summary": "Update database endpoint",
+    "service": "payment-api",
+    "source_status": "ok",
+    "source_truncated": false,
+    "attributes": {
+      "author": "fixture-user",
+      "revision": "abc123"
+    }
+  },
+  {
+    "source_type": "configuration",
+    "evidence_type": "configuration_change",
+    "summary": "Database host configuration changed",
+    "service": "payment-api",
+    "source_status": "partial",
+    "source_truncated": true,
+    "attributes": {
+      "configuration_change_id": "config-1",
+      "keys": ["DATABASE_HOST"]
+    }
+  },
+  {
+    "source_type": "deployments",
+    "evidence_type": "deployment_event",
+    "summary": "Deployment deploy-1 succeeded",
+    "service": "payment-api",
+    "source_status": "ok",
+    "source_truncated": false,
+    "attributes": {
+      "deployment_id": "deploy-1",
+      "revision": "abc123",
+      "status": "succeeded"
+    }
+  },
+  {
+    "source_type": "logs",
+    "evidence_type": "error_event",
+    "summary": "Database connection timeout",
+    "service": "payment-api",
+    "source_status": "ok",
+    "source_truncated": false,
+    "attributes": {
+      "error_signature": "db_timeout",
+      "level": "error"
+    }
+  },
+  {
+    "source_type": "metrics",
+    "evidence_type": "metric_observation",
+    "summary": "Metric http_500_rate = 0.42 ratio",
+    "service": "payment-api",
+    "source_status": "ok",
+    "source_truncated": false,
+    "attributes": {
+      "metric_name": "http_500_rate",
+      "unit": "ratio",
+      "value": 0.42
+    }
+  },
+  {
+    "source_type": "pipelines",
+    "evidence_type": "pipeline_event",
+    "summary": "Pipeline run pipeline-1 passed",
+    "service": "payment-api",
+    "source_status": "ok",
+    "source_truncated": false,
+    "attributes": {
+      "pipeline_run_id": "pipeline-1",
+      "revision": "abc123",
+      "stage": "deploy",
+      "status": "passed"
+    }
+  }
+]
