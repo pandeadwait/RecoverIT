@@ -49,6 +49,8 @@ class EvidenceDeduplicationService:
         self,
         candidates: tuple[SecuredEvidenceCandidate, ...],
         existing_matches: tuple[EvidenceRecord, ...] = (),
+        existing_aggregates: tuple[RepeatedEventAggregate, ...] = (),
+        existing_attachments: tuple[ProvenanceAttachment, ...] = (),
     ) -> DeduplicationResult:
         incident_ids = {candidate.incident_id for candidate in candidates}
         if len(incident_ids) > 1:
@@ -61,11 +63,13 @@ class EvidenceDeduplicationService:
         log_index: dict[tuple[str, str, int], str] = {}
         aggregate_state: dict[str, RepeatedEventAggregate] = {}
         known_ids: set[str] = set()
+        records_by_id: dict[str, EvidenceRecord] = {}
 
         for record in sorted(existing_matches, key=lambda item: item.evidence_id):
             if incident_id is not None and record.incident_id != incident_id:
                 continue
             known_ids.add(record.evidence_id)
+            records_by_id[record.evidence_id] = record
             if record.source_type not in _SUPPORTED_SOURCES:
                 continue
             exact = self._exact_key_for_record(record)
@@ -80,6 +84,23 @@ class EvidenceDeduplicationService:
                 aggregate_state.setdefault(
                     record.evidence_id, self._aggregate_from_record(record, log_key)
                 )
+
+        for aggregate in sorted(existing_aggregates, key=lambda item: item.evidence_id):
+            if aggregate.evidence_id in records_by_id:
+                aggregate_state[aggregate.evidence_id] = aggregate
+
+        for attachment in existing_attachments:
+            record = records_by_id.get(attachment.evidence_id)
+            if record is None or attachment.provenance.source_record_id is None:
+                continue
+            exact_index.setdefault(
+                (
+                    record.source_type,
+                    attachment.provenance.source_record_id,
+                    attachment.provenance.raw_payload_hash,
+                ),
+                record.evidence_id,
+            )
 
         creates: dict[str, IdentifiedEvidenceCandidate] = {}
         decisions: list[DeduplicationDecision] = []

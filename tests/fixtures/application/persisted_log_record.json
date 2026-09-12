@@ -1,0 +1,39 @@
+{
+  "attributes": {
+    "error_signature": "db_timeout",
+    "level": "error",
+    "x-processing-metadata": {
+      "event_time_approximate": false,
+      "event_time_offset": "+00:00",
+      "event_time_original": "2026-09-12T10:27:15Z",
+      "observed_at_offset": "+00:00",
+      "observed_at_original": "2026-09-12T10:27:16Z",
+      "quality_rationale": "reliability selected by default; freshness referenced to collected_at",
+      "redacted_paths": [],
+      "resource": "payment-api/instance-1"
+    }
+  },
+  "collected_at": "2026-09-12T10:31:00Z",
+  "event_time": "2026-09-12T10:27:15Z",
+  "evidence_id": "ev_3bbb695ec58952366f346f99",
+  "evidence_type": "error_event",
+  "incident_id": "inc_001",
+  "observed_at": "2026-09-12T10:27:16Z",
+  "provenance": {
+    "batch_id": "batch_phase_3",
+    "query_id": "qry_logs",
+    "raw_payload_hash": "sha256:08b322fad56cfdece7a3fc45ae7a5c1901f0828ff9d7eff387be1165f68adc95",
+    "source_adapter": "fixture-log-adapter",
+    "source_record_id": "log-1"
+  },
+  "quality": {
+    "freshness_seconds": 224,
+    "redactions_applied": false,
+    "reliability": "unknown",
+    "truncated_source": false
+  },
+  "schema_version": "1.0",
+  "service": "payment-api",
+  "source_type": "logs",
+  "summary": "Database connection timeout"
+}
