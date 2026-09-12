@@ -10,6 +10,7 @@ import logging
 from typing import Protocol
 
 from collectors.interfaces import BaseSource
+from collectors.specs import DEFAULT_CAPABILITY_SPECS, get_default_capability
 from contracts.collection.capabilities import (
     SourceCapability,
     SourceCapabilityCatalog,
@@ -19,96 +20,6 @@ from contracts.incident.seed import IncidentSeed
 from ingestion.alert.clock import Clock, SystemClock
 
 logger = logging.getLogger(__name__)
-
-# Standard query fields and limits per ARCHITECTURE §13.1 and WORK_DIVISION §6.5
-DEFAULT_CAPABILITY_SPECS: dict[SourceType, dict] = {
-    SourceType.LOGS: {
-        "supported_query_fields": [
-            "service",
-            "start_time",
-            "end_time",
-            "severity",
-            "pattern",
-            "limit",
-        ],
-        "maximum_window_seconds": 86400,
-        "maximum_items": 1000,
-    },
-    SourceType.METRICS: {
-        "supported_query_fields": [
-            "service",
-            "metric_name",
-            "start_time",
-            "end_time",
-            "aggregation",
-        ],
-        "maximum_window_seconds": 86400,
-        "maximum_items": 1000,
-    },
-    SourceType.CHANGES: {
-        "supported_query_fields": [
-            "repository",
-            "since",
-            "until",
-            "paths",
-            "max_commits",
-        ],
-        "maximum_window_seconds": 604800,
-        "maximum_items": 200,
-    },
-    SourceType.DEPLOYMENTS: {
-        "supported_query_fields": [
-            "service",
-            "since",
-            "until",
-            "limit",
-        ],
-        "maximum_window_seconds": 604800,
-        "maximum_items": 100,
-    },
-    SourceType.PIPELINES: {
-        "supported_query_fields": [
-            "pipeline",
-            "since",
-            "until",
-            "limit",
-        ],
-        "maximum_window_seconds": 604800,
-        "maximum_items": 100,
-    },
-    SourceType.CONFIGURATION: {
-        "supported_query_fields": [
-            "service",
-            "start_time",
-            "end_time",
-            "keys",
-        ],
-        "maximum_window_seconds": 604800,
-        "maximum_items": 200,
-    },
-}
-
-
-def get_default_capability(
-    source_type: SourceType, available: bool = True
-) -> SourceCapability:
-    """Return a standard SourceCapability descriptor for the given source type."""
-    spec = DEFAULT_CAPABILITY_SPECS.get(source_type, {})
-    if not available:
-        return SourceCapability(
-            source_type=source_type,
-            available=False,
-            supported_query_fields=[],
-            maximum_window_seconds=0,
-            maximum_items=0,
-        )
-    return SourceCapability(
-        source_type=source_type,
-        available=True,
-        supported_query_fields=list(spec.get("supported_query_fields", [])),
-        maximum_window_seconds=spec.get("maximum_window_seconds", 86400),
-        maximum_items=spec.get("maximum_items", 100),
-    )
 
 
 class SourceRegistry(Protocol):

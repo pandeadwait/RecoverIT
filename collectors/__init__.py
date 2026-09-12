@@ -1,5 +1,17 @@
 """Collectors package — source interfaces, registry, and collection service."""
 
+from collectors.changes.fixture_adapter import FixtureChangeAdapter
+from collectors.configuration.fixture_adapter import (
+    FixtureConfigurationAdapter,
+)
+from collectors.deployments.fixture_adapter import FixtureDeploymentAdapter
+from collectors.fixtures import (
+    ReplayAdapter,
+    create_scenario_adapters,
+    list_available_scenarios,
+    load_scenario_json,
+    load_scenario_records,
+)
 from collectors.interfaces import (
     BaseSource,
     ChangeSource,
@@ -11,6 +23,9 @@ from collectors.interfaces import (
     SourceQuery,
     SourceResult,
 )
+from collectors.logs.fixture_adapter import FixtureLogAdapter
+from collectors.metrics.fixture_adapter import FixtureMetricAdapter
+from collectors.pipelines.fixture_adapter import FixturePipelineAdapter
 
 __all__ = [
     "BaseSource",
@@ -22,4 +37,15 @@ __all__ = [
     "ConfigurationSource",
     "SourceQuery",
     "SourceResult",
+    "FixtureLogAdapter",
+    "FixtureMetricAdapter",
+    "FixtureChangeAdapter",
+    "FixtureDeploymentAdapter",
+    "FixturePipelineAdapter",
+    "FixtureConfigurationAdapter",
+    "ReplayAdapter",
+    "create_scenario_adapters",
+    "list_available_scenarios",
+    "load_scenario_json",
+    "load_scenario_records",
 ]
