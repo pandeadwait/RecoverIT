@@ -1,22 +1,22 @@
 """
-Deterministic ranking engine.
+Deterministic ranking engine for root-cause hypotheses.
 
-Combines pure feature calculators with configurable weights to compute
-the final evidence score (0-100), assign ranks, derive confidence labels,
-and produce canonical RankedHypothesisSet objects.
+Computes evidence scores (0–100) using deterministic feature calculators
+and configurable weights, applies deterministic tie-breaking, assigns unique ranks,
+and produces the final RankedHypothesisSet (the Person 3 project boundary).
 
 See WORK_DIVISION.md §8.6, §8.11 and ARCHITECTURE.md §8.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
-import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from contracts.common import (
     ConfidenceLabel,
@@ -27,127 +27,267 @@ from contracts.common import (
 from contracts.evidence.schemas import IncidentContextSnapshot
 from contracts.hypothesis.schemas import (
     BudgetUsage,
+    Hypothesis,
     HypothesisSet,
     RankedHypothesis,
     RankedHypothesisSet,
     ScoreBreakdown,
 )
-from reasoning.ranking.feature_calculators import (
-    calculate_change_consistency,
-    calculate_contradiction_penalty,
-    calculate_independent_source_support,
-    calculate_missing_evidence_penalty,
-    calculate_prediction_support,
-    calculate_specificity,
-    calculate_symptom_coverage,
-    calculate_temporal_consistency,
-)
+from reasoning.ranking import feature_calculators as fc
 
-logger = logging.getLogger(__name__)
+DEFAULT_CONFIG_PATH = Path(__file__).parent / "default_weights.json"
+
+
+# ---------------------------------------------------------------------------
+# Configuration Models
+# ---------------------------------------------------------------------------
 
 
 class RankingWeights(ContractModel):
     """
-    Configurable weights for hypothesis evidence scoring features.
-    Total positive weights sum to 100. Penalties subtract from score.
+    Configurable weights for the 8 deterministic ranking features.
+
+    Positive features contribute up to their weight towards evidence_score.
+    Penalty features subtract up to their weight from evidence_score.
     """
     independent_source_support: float = Field(
         default=25.0,
         ge=0.0,
-        description="Weight for distinct supporting sources (max points).",
+        description="Weight for distinct source types in supporting evidence.",
     )
     symptom_coverage: float = Field(
         default=20.0,
         ge=0.0,
-        description="Weight for fraction of symptoms explained (max points).",
+        description="Weight for fraction of symptoms explained.",
     )
     temporal_consistency: float = Field(
         default=15.0,
         ge=0.0,
-        description="Weight for timeline causal alignment (max points).",
+        description="Weight for causal timeline alignment.",
     )
     change_consistency: float = Field(
         default=15.0,
         ge=0.0,
-        description="Weight for change/deployment plausibility (max points).",
+        description="Weight for cited change plausibility.",
     )
     specificity: float = Field(
         default=10.0,
         ge=0.0,
-        description="Weight for hypothesis testability and specificity (max points).",
+        description="Weight for hypothesis testability/narrowness.",
     )
     prediction_support: float = Field(
         default=15.0,
         ge=0.0,
-        description="Weight for confirmed testable prediction (max points).",
+        description="Weight for confirmed testable prediction.",
     )
     contradiction_penalty: float = Field(
-        default=25.0,
+        default=30.0,
         ge=0.0,
-        description="Max penalty subtracted for contradicting evidence.",
+        description="Penalty weight for contradicting evidence.",
     )
     missing_evidence_penalty: float = Field(
-        default=15.0,
+        default=20.0,
         ge=0.0,
-        description="Max penalty subtracted for unresolved information needs.",
+        description="Penalty weight for unresolved critical information.",
     )
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> RankingWeights:
+        """Create RankingWeights from a dictionary."""
+        return cls.model_validate(data)
+
+    @classmethod
+    def from_file(cls, path: str | Path) -> RankingWeights:
+        """Load RankingWeights from a JSON file."""
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if "weights" in data:
+            data = data["weights"]
+        return cls.from_dict(data)
 
 
 class ConfidenceThresholds(ContractModel):
-    """Configurable score boundaries for ConfidenceLabel assignment."""
-    high_threshold: float = Field(
+    """
+    Thresholds for deriving human-readable confidence labels.
+
+    Score >= high -> HIGH
+    high > Score >= medium -> MEDIUM
+    Score < medium -> LOW
+    """
+    high: float = Field(
         default=70.0,
         ge=0.0,
         le=100.0,
-        description="Score required for high confidence.",
+        description="Score threshold for high confidence.",
     )
-    medium_threshold: float = Field(
+    medium: float = Field(
         default=40.0,
         ge=0.0,
         le=100.0,
-        description="Score required for medium confidence.",
+        description="Score threshold for medium confidence.",
     )
+
+    @model_validator(mode="after")
+    def validate_thresholds(self) -> ConfidenceThresholds:
+        if self.high < self.medium:
+            raise ValueError(
+                f"high threshold ({self.high}) must be >= medium threshold ({self.medium})"
+            )
+        return self
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> ConfidenceThresholds:
+        """Create ConfidenceThresholds from a dictionary."""
+        return cls.model_validate(data)
+
+    @classmethod
+    def from_file(cls, path: str | Path) -> ConfidenceThresholds:
+        """Load ConfidenceThresholds from a JSON file."""
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if "thresholds" in data:
+            data = data["thresholds"]
+        return cls.from_dict(data)
+
+
+class RankingConfig(ContractModel):
+    """Combined configuration for weights and confidence thresholds."""
+    weights: RankingWeights = Field(default_factory=RankingWeights)
+    thresholds: ConfidenceThresholds = Field(default_factory=ConfidenceThresholds)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> RankingConfig:
+        """Create RankingConfig from a dictionary."""
+        if "weights" in data or "thresholds" in data:
+            weights_data = data.get("weights", {})
+            thresholds_data = data.get("thresholds", {})
+            return cls(
+                weights=RankingWeights.from_dict(weights_data) if weights_data else RankingWeights(),
+                thresholds=ConfidenceThresholds.from_dict(thresholds_data) if thresholds_data else ConfidenceThresholds(),
+            )
+        # Flat dict containing only weights
+        return cls(weights=RankingWeights.from_dict(data))
+
+    @classmethod
+    def from_file(cls, path: str | Path) -> RankingConfig:
+        """Load RankingConfig from a JSON file."""
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return cls.from_dict(data)
+
+    @classmethod
+    def default(cls) -> RankingConfig:
+        """Load default configuration from default_weights.json if present."""
+        if DEFAULT_CONFIG_PATH.exists():
+            return cls.from_file(DEFAULT_CONFIG_PATH)
+        return cls()
+
+
+# ---------------------------------------------------------------------------
+# Ranking Engine
+# ---------------------------------------------------------------------------
 
 
 class RankingEngine:
     """
-    Deterministic ranking engine for incident hypotheses.
+    Deterministic ranking engine for hypothesis sets.
 
     Guarantees:
-    - Ranking is 100% deterministic for identical inputs.
-    - Pure feature calculators compute feature values.
-    - Configurable weights and thresholds loaded from config or dataclass.
-    - Stable tie-breaking using lexicographical hypothesis_id order.
-    - Assigned ranks are strictly sequential: 1, 2, 3...
-    - Produces canonical RankedHypothesisSet.
-    - Inconclusive results produced when evidence is inadequate or no supporting citations exist.
+    - Pure, deterministic feature calculation without LLM invocation.
+    - Configurable weights and thresholds loaded from files or dictionaries.
+    - Evidence score computed as sum of weighted positive features minus penalties, clamped to [0.0, 100.0].
+    - Deterministic tie-breaking by (-evidence_score, hypothesis_id).
+    - Inconclusive handling when no hypotheses have valid supporting evidence.
     """
 
     def __init__(
         self,
         weights: RankingWeights | None = None,
         thresholds: ConfidenceThresholds | None = None,
+        config: RankingConfig | None = None,
         config_path: str | Path | None = None,
     ) -> None:
-        self.weights = weights or RankingWeights()
-        self.thresholds = thresholds or ConfidenceThresholds()
-
         if config_path is not None:
-            self.load_config(config_path)
+            self._config = RankingConfig.from_file(config_path)
+        elif config is not None:
+            self._config = config
+        else:
+            base = RankingConfig.default()
+            self._config = RankingConfig(
+                weights=weights if weights is not None else base.weights,
+                thresholds=thresholds if thresholds is not None else base.thresholds,
+            )
 
-    def load_config(self, config_path: str | Path) -> None:
-        """Load weights and thresholds from a JSON configuration file."""
-        path = Path(config_path)
-        if not path.exists():
-            raise FileNotFoundError(f"Ranking configuration file not found: {path}")
+    @property
+    def config(self) -> RankingConfig:
+        return self._config
 
-        with path.open("r", encoding="utf-8") as f:
-            data = json.load(f)
+    @property
+    def weights(self) -> RankingWeights:
+        return self._config.weights
 
-        if "weights" in data:
-            self.weights = RankingWeights.model_validate(data["weights"])
-        if "thresholds" in data:
-            self.thresholds = ConfidenceThresholds.model_validate(data["thresholds"])
+    @property
+    def thresholds(self) -> ConfidenceThresholds:
+        return self._config.thresholds
+
+    def calculate_breakdown(
+        self,
+        hypothesis: Hypothesis,
+        context: IncidentContextSnapshot,
+    ) -> ScoreBreakdown:
+        """
+        Calculate individual feature contributions multiplied by their configured weights.
+        """
+        w = self.weights
+
+        iss = fc.calculate_independent_source_support(hypothesis, context)
+        sc = fc.calculate_symptom_coverage(hypothesis, context)
+        tc = fc.calculate_temporal_consistency(hypothesis, context)
+        cc = fc.calculate_change_consistency(hypothesis, context)
+        spec = fc.calculate_specificity(hypothesis, context)
+        ps = fc.calculate_prediction_support(hypothesis, context)
+        cp = fc.calculate_contradiction_penalty(hypothesis, context)
+        mep = fc.calculate_missing_evidence_penalty(hypothesis, context)
+
+        return ScoreBreakdown(
+            independent_source_support=round(iss * w.independent_source_support, 2),
+            symptom_coverage=round(sc * w.symptom_coverage, 2),
+            temporal_consistency=round(tc * w.temporal_consistency, 2),
+            change_consistency=round(cc * w.change_consistency, 2),
+            specificity=round(spec * w.specificity, 2),
+            prediction_support=round(ps * w.prediction_support, 2),
+            contradiction_penalty=round(cp * w.contradiction_penalty, 2),
+            missing_evidence_penalty=round(mep * w.missing_evidence_penalty, 2),
+        )
+
+    def calculate_evidence_score(self, breakdown: ScoreBreakdown) -> float:
+        """
+        Compute total evidence score from breakdown, clamped to [0.0, 100.0].
+        """
+        positive_sum = (
+            breakdown.independent_source_support
+            + breakdown.symptom_coverage
+            + breakdown.temporal_consistency
+            + breakdown.change_consistency
+            + breakdown.specificity
+            + breakdown.prediction_support
+        )
+        penalties = (
+            breakdown.contradiction_penalty
+            + breakdown.missing_evidence_penalty
+        )
+        raw_score = positive_sum - penalties
+        return round(max(0.0, min(100.0, raw_score)), 2)
+
+    def derive_confidence_label(self, score: float) -> ConfidenceLabel:
+        """
+        Derive categorical confidence label from numeric evidence score.
+        """
+        if score >= self.thresholds.high:
+            return ConfidenceLabel.HIGH
+        if score >= self.thresholds.medium:
+            return ConfidenceLabel.MEDIUM
+        return ConfidenceLabel.LOW
 
     def rank(
         self,
@@ -155,133 +295,105 @@ class RankingEngine:
         context: IncidentContextSnapshot,
         budget_usage: BudgetUsage | None = None,
         remaining_uncertainty: list[str] | None = None,
+        ranking_id: str | None = None,
+        stop_reason: StopReason | None = None,
+        status: InvestigationStatus | None = None,
+        created_at: datetime | None = None,
     ) -> RankedHypothesisSet:
         """
-        Rank a set of hypotheses deterministically against current context.
-        """
-        ranking_id = f"rank_{hypothesis_set.incident_id}_{int(datetime.now(timezone.utc).timestamp())}"
-        now = datetime.now(timezone.utc)
-        b_usage = budget_usage or BudgetUsage()
+        Rank hypotheses deterministically against incident context.
 
-        # Check inconclusive condition: empty hypotheses or no supporting evidence
-        has_any_supporting_evidence = any(
-            bool(h.supporting_evidence) for h in hypothesis_set.hypotheses
+        If no hypothesis has valid supporting evidence (or hypotheses set is empty),
+        returns an inconclusive RankedHypothesisSet with stop_reason set.
+        """
+        incident_id = hypothesis_set.incident_id or context.incident_id
+        effective_created_at = created_at if created_at is not None else context.created_at
+        effective_budget_usage = budget_usage or BudgetUsage()
+
+        if ranking_id is None:
+            content_key = f"{incident_id}_{context.snapshot_id}_{len(hypothesis_set.hypotheses)}"
+            short_hash = hashlib.sha256(content_key.encode()).hexdigest()[:8]
+            ranking_id = f"rank_{short_hash}"
+
+        # Determine if inconclusive:
+        # Check whether any hypothesis has valid supporting evidence in the context.
+        context_evidence_ids = {e.evidence_id for e in context.evidence}
+        has_any_valid_support = any(
+            any(c.evidence_id in context_evidence_ids for c in h.supporting_evidence)
+            for h in hypothesis_set.hypotheses
         )
 
-        if not hypothesis_set.hypotheses or not has_any_supporting_evidence:
+        is_inconclusive = (
+            status == InvestigationStatus.INCONCLUSIVE
+            or not hypothesis_set.hypotheses
+            or not has_any_valid_support
+        )
+
+        if is_inconclusive:
+            effective_stop_reason = (
+                stop_reason
+                if stop_reason is not None
+                else StopReason.INSUFFICIENT_EVIDENCE
+            )
+            effective_uncertainty = (
+                remaining_uncertainty
+                if remaining_uncertainty is not None
+                else ["No hypothesis has valid supporting evidence in the incident context."]
+            )
             return RankedHypothesisSet(
-                incident_id=hypothesis_set.incident_id,
+                incident_id=incident_id,
                 context_snapshot_id=context.snapshot_id,
                 ranking_id=ranking_id,
-                created_at=now,
+                created_at=effective_created_at,
                 status=InvestigationStatus.INCONCLUSIVE,
                 hypotheses=[],
-                remaining_uncertainty=remaining_uncertainty or ["Insufficient supporting evidence available."],
-                stop_reason=StopReason.INSUFFICIENT_EVIDENCE,
-                budget_usage=b_usage,
+                remaining_uncertainty=effective_uncertainty,
+                stop_reason=effective_stop_reason,
+                budget_usage=effective_budget_usage,
             )
 
-        scored_hypotheses: list[tuple[float, str, RankedHypothesis]] = []
-
+        # Score each hypothesis
+        scored_items: list[tuple[float, str, Hypothesis, ScoreBreakdown, ConfidenceLabel]] = []
         for h in hypothesis_set.hypotheses:
-            # 1. Feature calculations
-            f_supp = calculate_independent_source_support(h, context)
-            f_cov = calculate_symptom_coverage(h, context)
-            f_temp = calculate_temporal_consistency(h, context)
-            f_chg = calculate_change_consistency(h, context)
-            f_spec = calculate_specificity(h, context)
-            f_pred = calculate_prediction_support(h, context)
-            f_contra_pen = calculate_contradiction_penalty(h, context)
-            f_miss_pen = calculate_missing_evidence_penalty(h, context)
+            breakdown = self.calculate_breakdown(h, context)
+            score = self.calculate_evidence_score(breakdown)
+            confidence = self.derive_confidence_label(score)
+            scored_items.append((score, h.hypothesis_id, h, breakdown, confidence))
 
-            # 2. Weighted component scores
-            score_supp = f_supp * self.weights.independent_source_support
-            score_cov = f_cov * self.weights.symptom_coverage
-            score_temp = f_temp * self.weights.temporal_consistency
-            score_chg = f_chg * self.weights.change_consistency
-            score_spec = f_spec * self.weights.specificity
-            score_pred = f_pred * self.weights.prediction_support
-            pen_contra = f_contra_pen * self.weights.contradiction_penalty
-            pen_miss = f_miss_pen * self.weights.missing_evidence_penalty
+        # Deterministic sorting: highest score first, ties broken by hypothesis_id ascending
+        scored_items.sort(key=lambda item: (-item[0], item[1]))
 
-            raw_total = (
-                score_supp
-                + score_cov
-                + score_temp
-                + score_chg
-                + score_spec
-                + score_pred
-                - pen_contra
-                - pen_miss
-            )
-
-            evidence_score = max(0.0, min(100.0, round(raw_total, 2)))
-            confidence_label = self._derive_confidence_label(evidence_score)
-
-            breakdown = ScoreBreakdown(
-                independent_source_support=round(score_supp, 2),
-                symptom_coverage=round(score_cov, 2),
-                temporal_consistency=round(score_temp, 2),
-                change_consistency=round(score_chg, 2),
-                specificity=round(score_spec, 2),
-                prediction_support=round(score_pred, 2),
-                contradiction_penalty=round(pen_contra, 2),
-                missing_evidence_penalty=round(pen_miss, 2),
-            )
-
-            ranked_item = RankedHypothesis(
-                rank=1,  # reassigned below after sorting
-                hypothesis_id=h.hypothesis_id,
-                statement=h.statement,
-                root_cause_category=h.root_cause_category,
-                affected_component=h.affected_component,
-                evidence_score=evidence_score,
-                confidence_label=confidence_label,
-                supporting_evidence=h.supporting_evidence,
-                contradicting_evidence=h.contradicting_evidence,
-                unresolved_questions=h.missing_information_ids,
-                score_breakdown=breakdown,
-            )
-
-            # Tuple for sorting: (-score, hypothesis_id) -> highest score first, tiebreak lexicographically
-            scored_hypotheses.append((-evidence_score, h.hypothesis_id, ranked_item))
-
-        # Sort deterministically
-        scored_hypotheses.sort(key=lambda item: (item[0], item[1]))
-
-        final_ranked_hypotheses: list[RankedHypothesis] = []
-        for idx, (_, _, item) in enumerate(scored_hypotheses, start=1):
-            final_ranked_hypotheses.append(
+        # Build RankedHypothesis items with 1-based ranks
+        ranked_hypotheses: list[RankedHypothesis] = []
+        for rank_num, (score, _, h, breakdown, confidence) in enumerate(scored_items, start=1):
+            unresolved = [
+                f"Unresolved information need: {mid}"
+                for mid in h.missing_information_ids
+            ]
+            ranked_hypotheses.append(
                 RankedHypothesis(
-                    rank=idx,
-                    hypothesis_id=item.hypothesis_id,
-                    statement=item.statement,
-                    root_cause_category=item.root_cause_category,
-                    affected_component=item.affected_component,
-                    evidence_score=item.evidence_score,
-                    confidence_label=item.confidence_label,
-                    supporting_evidence=item.supporting_evidence,
-                    contradicting_evidence=item.contradicting_evidence,
-                    unresolved_questions=item.unresolved_questions,
-                    score_breakdown=item.score_breakdown,
+                    rank=rank_num,
+                    hypothesis_id=h.hypothesis_id,
+                    statement=h.statement,
+                    root_cause_category=h.root_cause_category,
+                    affected_component=h.affected_component,
+                    evidence_score=score,
+                    confidence_label=confidence,
+                    supporting_evidence=list(h.supporting_evidence),
+                    contradicting_evidence=list(h.contradicting_evidence),
+                    unresolved_questions=unresolved,
+                    score_breakdown=breakdown,
                 )
             )
 
         return RankedHypothesisSet(
-            incident_id=hypothesis_set.incident_id,
+            incident_id=incident_id,
             context_snapshot_id=context.snapshot_id,
             ranking_id=ranking_id,
-            created_at=now,
+            created_at=effective_created_at,
             status=InvestigationStatus.COMPLETED,
-            hypotheses=final_ranked_hypotheses,
+            hypotheses=ranked_hypotheses,
             remaining_uncertainty=remaining_uncertainty or [],
             stop_reason=None,
-            budget_usage=b_usage,
+            budget_usage=effective_budget_usage,
         )
-
-    def _derive_confidence_label(self, score: float) -> ConfidenceLabel:
-        if score >= self.thresholds.high_threshold:
-            return ConfidenceLabel.HIGH
-        elif score >= self.thresholds.medium_threshold:
-            return ConfidenceLabel.MEDIUM
-        return ConfidenceLabel.LOW
