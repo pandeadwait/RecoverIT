@@ -148,6 +148,23 @@ class InformationPriority(str, Enum):
     HIGH = "high"
 
 
+class InvestigationState(str, Enum):
+    """
+    Workflow states of an incident investigation.
+
+    See ARCHITECTURE.md §9.
+    """
+    RECEIVED = "RECEIVED"
+    ASSESSING_GAPS = "ASSESSING_GAPS"
+    COLLECTING_EVIDENCE = "COLLECTING_EVIDENCE"
+    BUILDING_TIMELINE = "BUILDING_TIMELINE"
+    GENERATING_HYPOTHESES = "GENERATING_HYPOTHESES"
+    RANKING = "RANKING"
+    COMPLETED = "COMPLETED"
+    INCONCLUSIVE = "INCONCLUSIVE"
+    CANCELLED = "CANCELLED"
+
+
 class InvestigationStatus(str, Enum):
     """Terminal status of a ranked hypothesis set."""
     COMPLETED = "completed"
