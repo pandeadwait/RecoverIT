@@ -66,6 +66,7 @@ from reasoning.hypotheses.citation_validator import CitationValidator
 from reasoning.hypotheses.generator import HypothesisGenerator
 from reasoning.hypotheses.reviser import HypothesisReviser
 from reasoning.provider.interface import ReasoningProvider
+from reasoning.provider.llm_provider import LLMProviderError
 from reasoning.ranking.ranking_engine import RankingEngine
 
 logger = logging.getLogger(__name__)
@@ -533,12 +534,20 @@ class InvestigationOrchestrator:
                 "MissingInformationAssessor.assess",
                 payload={"round": round_num},
             )
-            missing_info = await self._assessor.assess(
-                incident=incident,
-                source_capabilities=source_capabilities,
-                context=self._current_context,
-                active_hypotheses=active_list,
-            )
+            try:
+                missing_info = await self._assessor.assess(
+                    incident=incident,
+                    source_capabilities=source_capabilities,
+                    context=self._current_context,
+                    active_hypotheses=active_list,
+                )
+            except LLMProviderError as err:
+                logger.error("LLM reasoning failed during assessment: %s", err)
+                return self._finish_inconclusive(
+                    incident_id=incident.incident_id,
+                    reason=f"Reasoning provider failed: {err.error.message}",
+                    stop_reason=StopReason.INSUFFICIENT_EVIDENCE,
+                )
             self._budget_tracker.record_reasoning_call()
             self._state_machine.checkpoint_after_call(
                 "MissingInformationAssessor.assess",
@@ -647,11 +656,19 @@ class InvestigationOrchestrator:
                     "HypothesisGenerator.generate",
                     payload={"round": round_num},
                 )
-                self._current_hypotheses = await self._generator.generate(
-                    incident=incident,
-                    context=self._current_context,
-                    limits=effective_budget,
-                )
+                try:
+                    self._current_hypotheses = await self._generator.generate(
+                        incident=incident,
+                        context=self._current_context,
+                        limits=effective_budget,
+                    )
+                except LLMProviderError as err:
+                    logger.error("LLM reasoning failed during hypothesis generation: %s", err)
+                    return self._finish_inconclusive(
+                        incident_id=incident.incident_id,
+                        reason=f"Reasoning provider failed: {err.error.message}",
+                        stop_reason=StopReason.INSUFFICIENT_EVIDENCE,
+                    )
                 self._budget_tracker.record_reasoning_call()
                 self._state_machine.checkpoint_after_call(
                     "HypothesisGenerator.generate",
@@ -662,10 +679,18 @@ class InvestigationOrchestrator:
                     "HypothesisReviser.revise",
                     payload={"round": round_num},
                 )
-                self._current_hypotheses = await self._reviser.revise(
-                    previous_hypotheses=self._current_hypotheses,
-                    new_context=self._current_context,
-                )
+                try:
+                    self._current_hypotheses = await self._reviser.revise(
+                        previous_hypotheses=self._current_hypotheses,
+                        new_context=self._current_context,
+                    )
+                except LLMProviderError as err:
+                    logger.error("LLM reasoning failed during hypothesis revision: %s", err)
+                    return self._finish_inconclusive(
+                        incident_id=incident.incident_id,
+                        reason=f"Reasoning provider failed: {err.error.message}",
+                        stop_reason=StopReason.INSUFFICIENT_EVIDENCE,
+                    )
                 self._budget_tracker.record_reasoning_call()
                 self._state_machine.checkpoint_after_call(
                     "HypothesisReviser.revise",
