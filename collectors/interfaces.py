@@ -20,6 +20,19 @@ SourceResult = QueryResult
 
 
 @runtime_checkable
+class SourceRegistry(Protocol):
+    """Protocol for discovering capabilities and looking up source adapters."""
+
+    def capabilities(self, incident: IncidentSeed) -> Any:
+        """Produce the SourceCapabilityCatalog for the given incident."""
+        ...
+
+    def get_source(self, source_type: SourceType) -> BaseSource | None:
+        """Retrieve a registered source adapter by type."""
+        ...
+
+
+@runtime_checkable
 class BaseSource(Protocol):
     """Base protocol that all source adapters implement."""
 

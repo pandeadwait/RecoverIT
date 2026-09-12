@@ -12,6 +12,11 @@ from collectors.fixtures import (
     load_scenario_json,
     load_scenario_records,
 )
+from collectors.gateway import (
+    CollectionService,
+    DefaultCollectionService,
+    validate_query,
+)
 from collectors.interfaces import (
     BaseSource,
     ChangeSource,
@@ -26,6 +31,7 @@ from collectors.interfaces import (
 from collectors.logs.fixture_adapter import FixtureLogAdapter
 from collectors.metrics.fixture_adapter import FixtureMetricAdapter
 from collectors.pipelines.fixture_adapter import FixturePipelineAdapter
+from collectors.specs import DEFAULT_CAPABILITY_SPECS, get_default_capability
 
 __all__ = [
     "BaseSource",
@@ -48,4 +54,9 @@ __all__ = [
     "list_available_scenarios",
     "load_scenario_json",
     "load_scenario_records",
+    "CollectionService",
+    "DefaultCollectionService",
+    "validate_query",
+    "DEFAULT_CAPABILITY_SPECS",
+    "get_default_capability",
 ]
