@@ -12,8 +12,10 @@ from timeline.repositories.ports import TimelineRepository
 def _ordered_timeline(timeline: Timeline) -> Timeline:
     known = [event for event in timeline.events if event.event_time is not None]
     unknown = [event for event in timeline.events if event.event_time is None]
-    known.sort(key=lambda event: (event.event_time, event.timeline_event_id))
-    unknown.sort(key=lambda event: event.timeline_event_id)
+    known.sort(
+        key=lambda event: (event.event_time, event.evidence_ids, event.timeline_event_id)
+    )
+    unknown.sort(key=lambda event: (event.evidence_ids, event.timeline_event_id))
     relationships = tuple(sorted(timeline.relationships, key=lambda item: item.relationship_id))
     return Timeline(
         incident_id=timeline.incident_id,
