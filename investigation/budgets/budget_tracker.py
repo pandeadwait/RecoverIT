@@ -275,6 +275,9 @@ class BudgetTracker:
             reasoning_calls=self._reasoning_calls,
         )
 
+    # Alias for convenience
+    get_usage = get_budget_usage
+
     def get_detailed_usage(self) -> dict[str, Any]:
         """Return a detailed dictionary of all usage, limits, and remaining amounts."""
         return {
