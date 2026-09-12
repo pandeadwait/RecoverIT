@@ -1,0 +1,142 @@
+{
+  "assess_missing_information": {
+    "schema_version": "1.0",
+    "incident_id": "inc_recorded_01",
+    "assessment_id": "mia_rec_001",
+    "known_facts": [
+      {
+        "schema_version": "1.0",
+        "statement": "HTTP 500 spike observed on payment service.",
+        "evidence_ids": ["ev_rec_01"]
+      }
+    ],
+    "missing_information": [
+      {
+        "schema_version": "1.0",
+        "information_id": "need_deploy",
+        "question": "Was a deployment completed shortly before the error increase?",
+        "reason": "Differentiates configuration regression from external outage.",
+        "priority": "high",
+        "candidate_sources": ["deployments", "changes"],
+        "resolved": false
+      }
+    ],
+    "unavailable_information": [],
+    "recommended_stop": false
+  },
+  "plan_queries": {
+    "schema_version": "1.0",
+    "incident_id": "inc_recorded_01",
+    "plan_id": "plan_rec_001",
+    "round": 1,
+    "queries": [
+      {
+        "schema_version": "1.0",
+        "query_id": "qry_rec_001",
+        "source_type": "deployments",
+        "question": "Which deployments finished right before the incident?",
+        "parameters": {
+          "service": "payment-api",
+          "limit": 5
+        },
+        "related_information_ids": ["need_deploy"],
+        "discriminates_hypothesis_ids": ["hyp_rec_01"],
+        "expected_information_value": "high"
+      }
+    ],
+    "stop_reason": null
+  },
+  "generate_hypotheses": {
+    "schema_version": "1.0",
+    "incident_id": "inc_recorded_01",
+    "hypotheses": [
+      {
+        "schema_version": "1.0",
+        "hypothesis_id": "hyp_rec_01",
+        "incident_id": "inc_recorded_01",
+        "revision": 1,
+        "statement": "Deployment v2.4.1 broke payment-api database connection settings.",
+        "root_cause_category": "configuration_regression",
+        "affected_component": "payment-api",
+        "supporting_evidence": [
+          {
+            "schema_version": "1.0",
+            "evidence_id": "ev_rec_01",
+            "reason": "500 errors began immediately after deployment."
+          }
+        ],
+        "contradicting_evidence": [],
+        "missing_information_ids": ["need_deploy"],
+        "testable_prediction": "Diff of deployment configuration contains modified DB host.",
+        "status": "active"
+      },
+      {
+        "schema_version": "1.0",
+        "hypothesis_id": "hyp_rec_02",
+        "incident_id": "inc_recorded_01",
+        "revision": 1,
+        "statement": "External payment gateway was offline.",
+        "root_cause_category": "external_dependency_failure",
+        "affected_component": "payment-gateway",
+        "supporting_evidence": [],
+        "contradicting_evidence": [],
+        "missing_information_ids": [],
+        "testable_prediction": "Third party status page reports outage.",
+        "status": "active"
+      }
+    ],
+    "generated_at": "2026-09-12T10:00:00Z"
+  },
+  "revise_hypotheses": {
+    "schema_version": "1.0",
+    "incident_id": "inc_recorded_01",
+    "hypotheses": [
+      {
+        "schema_version": "1.0",
+        "hypothesis_id": "hyp_rec_01",
+        "incident_id": "inc_recorded_01",
+        "revision": 2,
+        "statement": "Deployment v2.4.1 broke payment-api database connection settings.",
+        "root_cause_category": "configuration_regression",
+        "affected_component": "payment-api",
+        "supporting_evidence": [
+          {
+            "schema_version": "1.0",
+            "evidence_id": "ev_rec_01",
+            "reason": "500 errors began immediately after deployment."
+          },
+          {
+            "schema_version": "1.0",
+            "evidence_id": "ev_rec_02",
+            "reason": "Deployment log shows modified DB port to invalid 9999."
+          }
+        ],
+        "contradicting_evidence": [],
+        "missing_information_ids": [],
+        "testable_prediction": "Diff of deployment configuration contains modified DB host.",
+        "status": "active"
+      },
+      {
+        "schema_version": "1.0",
+        "hypothesis_id": "hyp_rec_02",
+        "incident_id": "inc_recorded_01",
+        "revision": 2,
+        "statement": "External payment gateway was offline.",
+        "root_cause_category": "external_dependency_failure",
+        "affected_component": "payment-gateway",
+        "supporting_evidence": [],
+        "contradicting_evidence": [
+          {
+            "schema_version": "1.0",
+            "evidence_id": "ev_rec_03",
+            "reason": "Gateway health checks confirmed 100% uptime during the period."
+          }
+        ],
+        "missing_information_ids": [],
+        "testable_prediction": "Third party status page reports outage.",
+        "status": "rejected"
+      }
+    ],
+    "generated_at": "2026-09-12T10:05:00Z"
+  }
+}
