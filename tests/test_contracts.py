@@ -124,11 +124,11 @@ class ValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ContractValidationError, "unsupported_enum"):
             EvidenceRecord.from_dict(data)
 
-    def test_ignores_additive_unknown_optional_fields(self) -> None:
+    def test_rejects_additive_unknown_optional_fields(self) -> None:
         data = fixture("evidence_record.json")
         data["future_optional_field"] = {"producer": "person-1"}
-        parsed = EvidenceRecord.from_dict(data)
-        self.assertNotIn("future_optional_field", parsed.to_dict())
+        with self.assertRaisesRegex(ContractValidationError, "unknown_field"):
+            EvidenceRecord.from_dict(data)
 
     def test_rejects_non_json_attributes(self) -> None:
         data = fixture("evidence_record.json")

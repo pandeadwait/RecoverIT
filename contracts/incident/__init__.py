@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Mapping
 
-from contracts.common import SCHEMA_VERSION, datetime_to_wire, freeze_json, parse_datetime, require_extensible_code, require_identifier, require_mapping, require_schema_version, require_string, thaw_json
+from contracts.common import SCHEMA_VERSION, datetime_to_wire, freeze_json, parse_datetime, reject_unknown_fields, require_extensible_code, require_identifier, require_mapping, require_schema_version, require_string, thaw_json
 from contracts.incident.alert import IncidentAlert
 
 
@@ -43,6 +43,15 @@ class IncidentSeed:
     @classmethod
     def from_dict(cls, value: object) -> "IncidentSeed":
         data = require_mapping(value, "incident_seed")
+        reject_unknown_fields(
+            data,
+            {
+                "schema_version", "incident_id", "external_alert_id", "service",
+                "environment", "severity", "detected_at", "received_at",
+                "summary", "labels",
+            },
+            "incident_seed",
+        )
         require_schema_version(data)
         labels = require_mapping(data.get("labels", {}), "incident_seed.labels")
         return cls(

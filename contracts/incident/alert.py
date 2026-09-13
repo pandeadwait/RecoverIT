@@ -14,12 +14,13 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import AwareDatetime, BaseModel, Field
+from pydantic import AwareDatetime, Field
 
+from contracts.common import BoundaryModel
 from contracts.enums import Severity
 
 
-class IncidentAlert(BaseModel):
+class IncidentAlert(BoundaryModel):
     """Incoming alert that creates or attaches to an incident."""
 
     schema_version: Literal["1.0"] = "1.0"

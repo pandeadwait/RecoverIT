@@ -9,12 +9,13 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import Field, model_validator
 
+from contracts.common import BoundaryModel
 from contracts.enums import InformationValue, SourceType
 
 
-class EvidenceQuery(BaseModel):
+class EvidenceQuery(BoundaryModel):
     """A single evidence query within a plan."""
 
     query_id: str
@@ -26,7 +27,7 @@ class EvidenceQuery(BaseModel):
     expected_information_value: InformationValue
 
 
-class EvidenceQueryPlan(BaseModel):
+class EvidenceQueryPlan(BoundaryModel):
     """Collection of queries to execute in one investigation round.
 
     The plan can contain zero queries only when stop_reason is present.
@@ -38,3 +39,11 @@ class EvidenceQueryPlan(BaseModel):
     round: int
     queries: list[EvidenceQuery]
     stop_reason: str | None = None
+
+    @model_validator(mode="after")
+    def require_queries_or_stop_reason(self) -> "EvidenceQueryPlan":
+        if not self.queries and self.stop_reason is None:
+            raise ValueError("an empty query plan requires stop_reason")
+        if self.queries and self.stop_reason is not None:
+            raise ValueError("stop_reason requires an empty query list")
+        return self

@@ -107,6 +107,11 @@ class HypothesisSet(ContractModel):
         ...,
         description="Parent incident.",
     )
+    revision: int = Field(
+        default=1,
+        ge=1,
+        description="Revision shared by the hypotheses in this generation step.",
+    )
     hypotheses: list[Hypothesis] = Field(
         default_factory=list,
         description="All hypotheses, including rejected ones.",

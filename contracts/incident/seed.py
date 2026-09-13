@@ -9,12 +9,13 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import AwareDatetime, BaseModel, Field
+from pydantic import AwareDatetime, Field
 
+from contracts.common import BoundaryModel
 from contracts.enums import Severity
 
 
-class IncidentSeed(BaseModel):
+class IncidentSeed(BoundaryModel):
     """Validated incident seed created from an IncidentAlert."""
 
     schema_version: Literal["1.0"] = "1.0"

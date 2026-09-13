@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Mapping
 
-from contracts.common import SCHEMA_VERSION, datetime_to_wire, freeze_json, parse_datetime, require_bool, require_extensible_code, require_identifier, require_int, require_list, require_mapping, require_optional_datetime, require_schema_version, require_string, thaw_json
+from contracts.common import SCHEMA_VERSION, datetime_to_wire, freeze_json, parse_datetime, reject_unknown_fields, require_bool, require_extensible_code, require_identifier, require_int, require_list, require_mapping, require_optional_datetime, require_schema_version, require_string, thaw_json
 
 _SOURCE_TYPES = {"logs", "metrics", "changes", "deployments", "pipelines", "configuration"}
 _RELIABILITIES = {"low", "medium", "high"}
@@ -33,6 +33,7 @@ class EvidenceProvenance:
     @classmethod
     def from_dict(cls, value: object, path: str = "evidence_provenance") -> "EvidenceProvenance":
         data = require_mapping(value, path)
+        reject_unknown_fields(data, {"batch_id", "query_id", "source_record_id", "source_adapter", "raw_payload_hash"}, path)
         return cls(
             batch_id=require_identifier(data.get("batch_id"), f"{path}.batch_id"),
             query_id=require_identifier(data.get("query_id"), f"{path}.query_id"),
@@ -70,6 +71,7 @@ class EvidenceQuality:
     @classmethod
     def from_dict(cls, value: object, path: str = "evidence_quality") -> "EvidenceQuality":
         data = require_mapping(value, path)
+        reject_unknown_fields(data, {"reliability", "freshness_seconds", "truncated_source", "redactions_applied"}, path)
         freshness = data.get("freshness_seconds")
         return cls(
             reliability=require_extensible_code(data.get("reliability"), f"{path}.reliability", _RELIABILITIES),
@@ -124,6 +126,11 @@ class EvidenceRecord:
     @classmethod
     def from_dict(cls, value: object) -> "EvidenceRecord":
         data = require_mapping(value, "evidence_record")
+        reject_unknown_fields(
+            data,
+            {"schema_version", "evidence_id", "incident_id", "source_type", "evidence_type", "service", "event_time", "observed_at", "collected_at", "summary", "attributes", "provenance", "quality"},
+            "evidence_record",
+        )
         require_schema_version(data)
         return cls(
             schema_version=data["schema_version"],
@@ -200,6 +207,11 @@ class EvidenceFilter:
     @classmethod
     def from_dict(cls, value: object) -> "EvidenceFilter":
         data = require_mapping(value, "evidence_filter")
+        reject_unknown_fields(
+            data,
+            {"schema_version", "incident_id", "evidence_ids", "source_types", "evidence_types", "service", "start_time", "end_time", "include_unknown_event_time", "limit"},
+            "evidence_filter",
+        )
         evidence_ids = require_list(data.get("evidence_ids", []), "evidence_filter.evidence_ids")
         source_types = require_list(data.get("source_types", []), "evidence_filter.source_types")
         evidence_types = require_list(data.get("evidence_types", []), "evidence_filter.evidence_types")

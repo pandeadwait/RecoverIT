@@ -57,6 +57,18 @@ class EvidenceQuality(ContractModel):
         default=False,
         description="Whether any redactions were applied.",
     )
+    is_first_party: bool | None = Field(
+        default=None,
+        description="Whether the evidence came directly from an owned source.",
+    )
+    is_direct_observation: bool | None = Field(
+        default=None,
+        description="Whether the evidence directly observes the reported event.",
+    )
+    is_truncated: bool | None = Field(
+        default=None,
+        description="Legacy projection flag indicating truncated evidence.",
+    )
 
 
 class EvidenceRecord(ContractModel):
@@ -119,9 +131,11 @@ class TimelineEvent(ContractModel):
         description="Unique identifier for this timeline event.",
     )
     incident_id: str = Field(..., description="Parent incident.")
-    event_time: datetime = Field(..., description="When the event occurred.")
-    time_uncertainty_ms: int = Field(
-        default=0,
+    event_time: datetime | None = Field(
+        default=None, description="When the event occurred, if known."
+    )
+    time_uncertainty_ms: int | None = Field(
+        default=None,
         description="Uncertainty in the event time in milliseconds.",
     )
     category: TimelineCategory = Field(
@@ -167,6 +181,10 @@ class TemporalRelationship(ContractModel):
         default=RelationshipCreator.DETERMINISTIC,
         description="How this relationship was established.",
     )
+    strength: str | None = Field(
+        default=None,
+        description="Optional relationship confidence strength.",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -196,9 +214,16 @@ class IncidentSummary(ContractModel):
 class TimelineEventProjection(ContractModel):
     """Compact timeline event within a context snapshot."""
     timeline_event_id: str = Field(..., description="Timeline event ID.")
-    event_time: datetime = Field(..., description="When the event occurred.")
+    incident_id: str | None = Field(default=None, description="Parent incident.")
+    event_time: datetime | None = Field(
+        default=None, description="When the event occurred, if known."
+    )
+    time_uncertainty_ms: int | None = Field(
+        default=None, description="Uncertainty in the event time."
+    )
     category: TimelineCategory = Field(..., description="Event category.")
     title: str = Field(..., description="Short description.")
+    service: str | None = Field(default=None, description="Affected service.")
     evidence_ids: list[str] = Field(default_factory=list, description="Supporting evidence.")
 
 
@@ -235,7 +260,7 @@ class IncidentContextSnapshot(ContractModel):
         default_factory=dict,
         description="Query status per source type.",
     )
-    warnings: list[str] = Field(
+    warnings: list[str | dict[str, Any]] = Field(
         default_factory=list,
         description="Non-fatal issues in context assembly.",
     )

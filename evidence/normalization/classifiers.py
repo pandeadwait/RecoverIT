@@ -103,19 +103,35 @@ class MetricClassifier:
         self, raw_record: RawEvidenceRecord, payload: Mapping[str, Any]
     ) -> ClassifiedRecord:
         name = _identity(payload, ("metric", "metric_name", "name"))
-        if name is None or "value" not in payload:
-            raise RecordNormalizationError("metric payload requires a name and value")
-        value = thaw_json(payload["value"])
-        if isinstance(value, (dict, list)) or value is None:
-            raise RecordNormalizationError("metric value must be a JSON scalar")
+        if name is None or not ({"value", "values"} & set(payload)):
+            raise RecordNormalizationError("metric payload requires a name and value(s)")
+        values = thaw_json(payload.get("values"))
+        if values is not None:
+            if (
+                not isinstance(values, list)
+                or not values
+                or any(isinstance(item, (dict, list)) or item is None for item in values)
+            ):
+                raise RecordNormalizationError(
+                    "metric values must be a non-empty array of JSON scalars"
+                )
+            value = values[-1]
+        else:
+            value = thaw_json(payload.get("value"))
+            if isinstance(value, (dict, list)) or value is None:
+                raise RecordNormalizationError("metric value must be a JSON scalar")
         unit = _text(payload.get("unit"))
         service, resource = _common_identity(payload)
         display = f"Metric {name} = {value}"
         if unit is not None:
             display += f" {unit}"
         attributes = {"metric_name": name, "value": value}
+        if values is not None:
+            attributes["values"] = values
         if unit is not None:
             attributes["unit"] = unit
+        if "baseline" in payload:
+            attributes["baseline"] = thaw_json(payload["baseline"])
         if "dimensions" in payload:
             attributes["dimensions"] = thaw_json(payload["dimensions"])
         return ClassifiedRecord(

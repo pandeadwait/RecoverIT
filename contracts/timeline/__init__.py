@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from contracts.common import SCHEMA_VERSION, datetime_to_wire, parse_datetime, require_extensible_code, require_identifier, require_int, require_list, require_mapping, require_optional_datetime, require_schema_version, require_string
+from contracts.common import SCHEMA_VERSION, datetime_to_wire, parse_datetime, reject_unknown_fields, require_extensible_code, require_identifier, require_int, require_list, require_mapping, require_optional_datetime, require_schema_version, require_string
 
 _TIMELINE_CATEGORIES = {"change", "deployment", "symptom", "alert", "action", "verification"}
 _RELATIONSHIP_TYPES = {"PRECEDES", "COINCIDES_WITH", "SUPPORTS", "CONTRADICTS", "DEPLOYED_FROM", "AFFECTS", "OBSERVED_ON", "PREDICTS"}
@@ -49,6 +49,7 @@ class TimelineEvent:
     @classmethod
     def from_dict(cls, value: object, path: str = "timeline_event") -> "TimelineEvent":
         data = require_mapping(value, path)
+        reject_unknown_fields(data, {"schema_version", "timeline_event_id", "incident_id", "event_time", "time_uncertainty_ms", "category", "title", "service", "evidence_ids"}, path)
         require_schema_version(data, f"{path}.schema_version")
         evidence_ids = require_list(data.get("evidence_ids"), f"{path}.evidence_ids")
         uncertainty = data.get("time_uncertainty_ms")
@@ -111,6 +112,7 @@ class TemporalRelationship:
     @classmethod
     def from_dict(cls, value: object, path: str = "temporal_relationship") -> "TemporalRelationship":
         data = require_mapping(value, path)
+        reject_unknown_fields(data, {"schema_version", "relationship_id", "incident_id", "from_event_id", "to_event_id", "relationship_type", "created_by", "delta_ms", "strength"}, path)
         require_schema_version(data, f"{path}.schema_version")
         delta = data.get("delta_ms")
         return cls(

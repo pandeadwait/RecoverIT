@@ -23,7 +23,7 @@ pythonpath = ["."]
 asyncio_mode = "auto"
 
 [tool.setuptools.packages.find]
-include = ["contracts*", "ingestion*", "collectors*", "evidence*", "timeline*", "investigation*", "reasoning*"]
+include = ["contracts*", "ingestion*", "collectors*", "evidence*", "timeline*", "investigation*", "reasoning*", "integration_runtime*"]
 
 [tool.unittest]
 start-directory = "tests"

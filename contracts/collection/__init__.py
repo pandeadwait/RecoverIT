@@ -6,14 +6,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Mapping
 
-from contracts.common import SCHEMA_VERSION, datetime_to_wire, freeze_json, parse_datetime, require_bool, require_extensible_code, require_identifier, require_list, require_mapping, require_optional_datetime, require_schema_version, require_string, thaw_json
+from contracts.common import SCHEMA_VERSION, datetime_to_wire, freeze_json, parse_datetime, reject_unknown_fields, require_bool, require_extensible_code, require_identifier, require_list, require_mapping, require_optional_datetime, require_schema_version, require_string, thaw_json
 from contracts.errors import ProcessingError, ProcessingWarning
 from contracts.collection.batch import QueryResult, RawRecord
 from contracts.collection.capabilities import SourceCapability, SourceCapabilityCatalog
 from contracts.collection.query_plan import EvidenceQuery, EvidenceQueryPlan
 
 _SOURCE_TYPES = {"logs", "metrics", "changes", "deployments", "pipelines", "configuration"}
-_SOURCE_STATUSES = {"ok", "partial", "unavailable", "error"}
+_SOURCE_STATUSES = {"ok", "partial", "unavailable", "timeout", "error"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +37,11 @@ class RawEvidenceRecord:
     @classmethod
     def from_dict(cls, value: object, path: str = "raw_evidence_record") -> "RawEvidenceRecord":
         data = require_mapping(value, path)
+        reject_unknown_fields(
+            data,
+            {"source_record_id", "event_time", "observed_at", "content_type", "payload"},
+            path,
+        )
         return cls(
             source_record_id=None if data.get("source_record_id") is None else require_identifier(data.get("source_record_id"), f"{path}.source_record_id"),
             event_time=require_optional_datetime(data, "event_time", f"{path}.event_time"),
@@ -78,6 +83,11 @@ class SourceResult:
     @classmethod
     def from_dict(cls, value: object, path: str = "source_result") -> "SourceResult":
         data = require_mapping(value, path)
+        reject_unknown_fields(
+            data,
+            {"query_id", "source_type", "source_adapter", "source_status", "truncated", "records", "warnings"},
+            path,
+        )
         records = require_list(data.get("records", []), f"{path}.records")
         warnings = require_list(data.get("warnings", []), f"{path}.warnings")
         return cls(
@@ -126,6 +136,11 @@ class RawEvidenceBatch:
     @classmethod
     def from_dict(cls, value: object) -> "RawEvidenceBatch":
         data = require_mapping(value, "raw_evidence_batch")
+        reject_unknown_fields(
+            data,
+            {"schema_version", "incident_id", "plan_id", "batch_id", "collected_at", "results", "errors"},
+            "raw_evidence_batch",
+        )
         require_schema_version(data)
         results = require_list(data.get("results"), "raw_evidence_batch.results")
         errors = require_list(data.get("errors", []), "raw_evidence_batch.errors")

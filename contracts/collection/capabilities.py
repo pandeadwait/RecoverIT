@@ -8,12 +8,13 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import AwareDatetime, BaseModel
+from pydantic import AwareDatetime
 
+from contracts.common import BoundaryModel
 from contracts.enums import SourceType
 
 
-class SourceCapability(BaseModel):
+class SourceCapability(BoundaryModel):
     """Capability descriptor for a single data source."""
 
     source_type: SourceType
@@ -23,7 +24,7 @@ class SourceCapability(BaseModel):
     maximum_items: int
 
 
-class SourceCapabilityCatalog(BaseModel):
+class SourceCapabilityCatalog(BoundaryModel):
     """Catalog of all source capabilities for an incident."""
 
     schema_version: Literal["1.0"] = "1.0"

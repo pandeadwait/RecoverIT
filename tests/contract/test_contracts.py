@@ -342,7 +342,11 @@ class TestEvidenceQueryPlan:
 
     def test_schema_version_present(self):
         plan = EvidenceQueryPlan(
-            incident_id="inc_001", plan_id="plan_001", round=1, queries=[]
+            incident_id="inc_001",
+            plan_id="plan_001",
+            round=1,
+            queries=[],
+            stop_reason="insufficient_evidence",
         )
         data = json.loads(plan.model_dump_json())
         assert data["schema_version"] == "1.0"

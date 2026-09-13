@@ -9,13 +9,14 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import AwareDatetime, BaseModel, Field
+from pydantic import AwareDatetime, Field
 
+from contracts.common import BoundaryModel
 from contracts.enums import SourceStatus, SourceType
 from contracts.errors import StructuredError
 
 
-class RawRecord(BaseModel):
+class RawRecord(BoundaryModel):
     """A single raw record from a data source."""
 
     source_record_id: str
@@ -25,7 +26,7 @@ class RawRecord(BaseModel):
     payload: dict[str, Any]
 
 
-class QueryResult(BaseModel):
+class QueryResult(BoundaryModel):
     """Result of executing a single query against one source."""
 
     query_id: str
@@ -37,7 +38,7 @@ class QueryResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
-class RawEvidenceBatch(BaseModel):
+class RawEvidenceBatch(BoundaryModel):
     """Batch of raw evidence collected for one plan execution."""
 
     schema_version: Literal["1.0"] = "1.0"

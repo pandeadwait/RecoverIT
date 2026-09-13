@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import Field
+from pydantic import AliasChoices, Field, model_validator
 
 from contracts.common import (
     ContractModel,
@@ -92,6 +92,7 @@ class KnownFact(ContractModel):
     )
     evidence_ids: list[str] = Field(
         default_factory=list,
+        validation_alias=AliasChoices("evidence_ids", "supporting_evidence_ids"),
         description="Evidence records supporting this fact.",
     )
 
@@ -136,6 +137,10 @@ class MissingInformationAssessment(ContractModel):
     assessment_id: str = Field(
         ...,
         description="Unique identifier for this assessment.",
+    )
+    generated_at: datetime | None = Field(
+        default=None,
+        description="When the assessment was produced, when supplied by the provider.",
     )
     known_facts: list[KnownFact] = Field(
         default_factory=list,
@@ -219,3 +224,11 @@ class EvidenceQueryPlan(ContractModel):
         default=None,
         description="If set, no queries are needed and investigation should stop.",
     )
+
+    @model_validator(mode="after")
+    def require_queries_or_stop_reason(self) -> "EvidenceQueryPlan":
+        if not self.queries and self.stop_reason is None:
+            raise ValueError("an empty query plan requires stop_reason")
+        if self.queries and self.stop_reason is not None:
+            raise ValueError("stop_reason requires an empty query list")
+        return self

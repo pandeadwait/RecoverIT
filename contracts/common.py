@@ -7,9 +7,9 @@ from datetime import datetime, timezone
 from enum import StrEnum
 import json
 from types import MappingProxyType
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 SCHEMA_VERSION = "1.0"
 JSONValue = str | int | float | bool | None | tuple["JSONValue", ...] | Mapping[str, "JSONValue"]
@@ -55,6 +55,7 @@ class Reliability(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
+    UNKNOWN = "unknown"
 
 
 class SourceCoverageState(StrEnum):
@@ -69,15 +70,19 @@ SourceCoverageStatus = SourceCoverageState
 
 
 class EvidenceType(StrEnum):
+    LOG_EVENT = "log_event"
     ERROR_EVENT = "error_event"
     WARNING_EVENT = "warning_event"
     INFO_EVENT = "info_event"
     METRIC_ANOMALY = "metric_anomaly"
     METRIC_NORMAL = "metric_normal"
+    METRIC_OBSERVATION = "metric_observation"
     CODE_CHANGE = "code_change"
+    SOURCE_CHANGE = "source_change"
     CONFIGURATION_CHANGE = "configuration_change"
     DEPLOYMENT_EVENT = "deployment_event"
     PIPELINE_RESULT = "pipeline_result"
+    PIPELINE_EVENT = "pipeline_event"
     HEALTH_CHECK = "health_check"
     OPERATOR_NOTE = "operator_note"
 
@@ -170,16 +175,32 @@ class InformationValueLevel(StrEnum):
     HIGH = "high"
 
 
-class ContractModel(BaseModel):
+class BoundaryModel(BaseModel):
+    """Strict Pydantic boundary model with canonical UTC datetimes."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("*", mode="after")
+    @classmethod
+    def _require_utc_datetimes(cls, value: Any) -> Any:
+        if isinstance(value, datetime):
+            if value.tzinfo is None or value.utcoffset() is None:
+                raise ValueError("timestamp must include timezone information")
+            return value.astimezone(timezone.utc)
+        return value
+
+
+class ContractModel(BoundaryModel):
     """Frozen Pydantic base used by Person 3's serialized schemas."""
 
     model_config = ConfigDict(
         frozen=True,
         use_enum_values=True,
+        extra="forbid",
         json_schema_extra={"additionalProperties": False},
     )
 
-    schema_version: str = Field(default=SCHEMA_VERSION)
+    schema_version: Literal["1.0"] = Field(default=SCHEMA_VERSION)
 
 
 def require_mapping(value: object, path: str) -> Mapping[str, Any]:
@@ -188,6 +209,19 @@ def require_mapping(value: object, path: str) -> Mapping[str, Any]:
     if not all(isinstance(key, str) for key in value):
         raise ContractValidationError("invalid_key", path, "must contain string keys")
     return value
+
+
+def reject_unknown_fields(
+    data: Mapping[str, Any], allowed: set[str], path: str
+) -> None:
+    """Reject unversioned extension fields at a serialized trust boundary."""
+
+    unknown = set(data) - allowed
+    if unknown:
+        names = ", ".join(sorted(unknown))
+        raise ContractValidationError(
+            "unknown_field", path, f"unexpected field(s): {names}"
+        )
 
 
 def require_list(value: object, path: str) -> Sequence[Any]:

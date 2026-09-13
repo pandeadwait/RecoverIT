@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Mapping
 
-from contracts.common import SCHEMA_VERSION, datetime_to_wire, freeze_json, parse_datetime, require_extensible_code, require_identifier, require_int, require_list, require_mapping, require_schema_version, require_string, thaw_json
+from contracts.common import SCHEMA_VERSION, datetime_to_wire, freeze_json, parse_datetime, reject_unknown_fields, require_extensible_code, require_identifier, require_int, require_list, require_mapping, require_schema_version, require_string, thaw_json
 from contracts.errors import ProcessingWarning
 from contracts.evidence import EvidenceQuality
 from contracts.timeline import Timeline
@@ -33,6 +33,7 @@ class IncidentSummary:
     @classmethod
     def from_dict(cls, value: object, path: str = "incident") -> "IncidentSummary":
         data = require_mapping(value, path)
+        reject_unknown_fields(data, {"service", "environment", "severity", "detected_at", "summary"}, path)
         return cls(
             service=require_string(data.get("service"), f"{path}.service"),
             environment=require_string(data.get("environment"), f"{path}.environment"),
@@ -71,6 +72,7 @@ class EvidenceProjection:
     @classmethod
     def from_dict(cls, value: object, path: str = "evidence_projection") -> "EvidenceProjection":
         data = require_mapping(value, path)
+        reject_unknown_fields(data, {"evidence_id", "source_type", "evidence_type", "event_time", "summary", "quality"}, path)
         event_value = data.get("event_time")
         return cls(
             evidence_id=require_identifier(data.get("evidence_id"), f"{path}.evidence_id"),
@@ -137,6 +139,11 @@ class IncidentContextSnapshot:
     @classmethod
     def from_dict(cls, value: object) -> "IncidentContextSnapshot":
         data = require_mapping(value, "incident_context_snapshot")
+        reject_unknown_fields(
+            data,
+            {"schema_version", "snapshot_id", "incident_id", "revision", "created_at", "incident", "evidence", "timeline", "relationships", "source_coverage", "warnings"},
+            "incident_context_snapshot",
+        )
         require_schema_version(data)
         evidence = require_list(data.get("evidence"), "incident_context_snapshot.evidence")
         timeline_events = require_list(data.get("timeline"), "incident_context_snapshot.timeline")
