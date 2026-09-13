@@ -231,6 +231,73 @@ def test_llm_provider_implements_reasoning_provider_protocol() -> None:
 
 
 @pytest.mark.asyncio
+async def test_llm_plan_is_anchored_and_clamped_to_source_capability(
+    sample_incident: IncidentSeed,
+    sample_context: IncidentContextSnapshot,
+    sample_budget: InvestigationBudget,
+) -> None:
+    catalog = SourceCapabilityCatalog(
+        incident_id=sample_incident.incident_id,
+        generated_at=sample_incident.received_at,
+        sources=[
+            SourceCapability(
+                source_type=SourceType.DEPLOYMENTS,
+                available=True,
+                supported_query_fields=["service", "since", "until", "limit"],
+                maximum_window_seconds=604800,
+                maximum_items=100,
+            )
+        ],
+    )
+    raw_plan = json.dumps({
+        "schema_version": "1.0",
+        "incident_id": sample_incident.incident_id,
+        "plan_id": "plan_untrusted_llm",
+        "round": 1,
+        "queries": [
+            {
+                "query_id": "qry_untrusted_llm",
+                "source_type": "deployments",
+                "question": "Fetch deployments",
+                "parameters": {
+                    "service": "invented-service",
+                    "since": "2023-01-01T00:00:00Z",
+                    "until": "2023-12-31T23:59:59Z",
+                    "limit": 1000,
+                },
+                "related_information_ids": [],
+                "expected_information_value": "high",
+            }
+        ],
+        "stop_reason": None,
+    })
+    missing = MissingInformationAssessment(
+        incident_id=sample_incident.incident_id,
+        assessment_id="mia_untrusted_llm",
+        missing_information=[
+            MissingInformationItem(
+                information_id="need_deployment",
+                question="What was deployed?",
+                reason="Determine change consistency",
+                priority=InformationPriority.HIGH,
+                candidate_sources=[SourceType.DEPLOYMENTS],
+            )
+        ],
+    )
+    provider = LLMReasoningProvider(client=MockLLMClient(default_response=raw_plan))
+
+    plan = await provider.plan_queries(missing, catalog, sample_context, sample_budget)
+
+    params = plan.queries[0].parameters
+    start = datetime.fromisoformat(params["since"].replace("Z", "+00:00"))
+    end = datetime.fromisoformat(params["until"].replace("Z", "+00:00"))
+    assert params["service"] == sample_incident.service
+    assert params["limit"] == 100
+    assert end == sample_incident.detected_at
+    assert (end - start).total_seconds() == 604800
+
+
+@pytest.mark.asyncio
 async def test_llm_provider_valid_structured_output_all_methods(
     sample_incident: IncidentSeed,
     sample_catalog: SourceCapabilityCatalog,

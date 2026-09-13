@@ -23,7 +23,7 @@ import json
 import logging
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Protocol, TypeVar, runtime_checkable
 
 from pydantic import BaseModel, ValidationError
@@ -328,7 +328,9 @@ class LLMReasoningProvider:
         system_instruction = (
             "You are an expert SRE incident investigator. Generate an EvidenceQueryPlan "
             "to answer missing information questions. Ensure every query uses only supported "
-            "fields from available sources in the catalog. Return valid JSON matching the "
+            "fields from available sources in the catalog. Center every time range on the "
+            "incident detected_at timestamp, keep it within maximum_window_seconds, and use "
+            "the incident's exact service name. Return valid JSON matching the "
             "EvidenceQueryPlan schema."
         )
 
@@ -359,6 +361,44 @@ class LLMReasoningProvider:
                     norm_k = synonyms.get(k, k)
                     if norm_k in supported:
                         new_params[norm_k] = v
+
+                # LLM output is untrusted even when it satisfies the JSON schema.
+                # Enforce semantic source constraints deterministically.
+                if "service" in supported:
+                    new_params["service"] = context.incident.service
+
+                for count_field in ("limit", "max_commits", "max_items"):
+                    if count_field in new_params:
+                        try:
+                            new_params[count_field] = max(
+                                1, min(int(new_params[count_field]), cap.maximum_items)
+                            )
+                        except (TypeError, ValueError):
+                            new_params.pop(count_field, None)
+
+                time_pairs = [
+                    ("start_time", "end_time"),
+                    ("since", "until"),
+                ]
+                supported_pairs = [
+                    pair for pair in time_pairs if pair[0] in supported and pair[1] in supported
+                ]
+                if supported_pairs and cap.maximum_window_seconds > 0:
+                    selected_pair = next(
+                        (
+                            pair
+                            for pair in supported_pairs
+                            if pair[0] in new_params or pair[1] in new_params
+                        ),
+                        supported_pairs[0],
+                    )
+                    for start_key, end_key in time_pairs:
+                        new_params.pop(start_key, None)
+                        new_params.pop(end_key, None)
+                    anchor = context.incident.detected_at.astimezone(timezone.utc)
+                    start = anchor - timedelta(seconds=cap.maximum_window_seconds)
+                    new_params[selected_pair[0]] = start.isoformat().replace("+00:00", "Z")
+                    new_params[selected_pair[1]] = anchor.isoformat().replace("+00:00", "Z")
                 normalized_queries.append(q.model_copy(update={"parameters": new_params}))
             else:
                 normalized_queries.append(q)
@@ -459,7 +499,7 @@ class LLMReasoningProvider:
                 retry_count = attempt + 1
                 if attempt < self._max_retries:
                     logger.warning(
-                        "Transient error calling LLM in %s (attempt %d/%d): %s. Backing off for %.3fs",
+                        "Transient error calling LLM in %s (attempt %d/%d): %r. Backing off for %.3fs",
                         method,
                         attempt + 1,
                         self._max_retries,
@@ -469,7 +509,7 @@ class LLMReasoningProvider:
                     await asyncio.sleep(backoff)
                     backoff *= self._backoff_multiplier
                 else:
-                    logger.error("Exhausted retries calling LLM in %s: %s", method, exc)
+                    logger.error("Exhausted retries calling LLM in %s: %r", method, exc)
 
         if response is None:
             err = StructuredError(
@@ -627,6 +667,8 @@ class LLMReasoningProvider:
             "source_capabilities": source_capabilities.model_dump(mode="json"),
             "budget": budget.model_dump(mode="json"),
             "context_snapshot_id": context.snapshot_id,
+            "context_created_at": context.created_at.isoformat(),
+            "incident": context.incident.model_dump(mode="json"),
         }
         allowed_params = {
             (s.source_type.value if hasattr(s.source_type, "value") else str(s.source_type)): s.supported_query_fields
@@ -637,7 +679,9 @@ class LLMReasoningProvider:
             f"Prompt Version: {PROMPT_VERSION_PLAN}\n"
             f"Allowed query parameter fields for available sources:\n"
             f"{json.dumps(allowed_params, indent=2)}\n\n"
-            f"Plan queries for missing information (CRITICAL: only use allowed fields above for each source):\n"
+            "CRITICAL: use the incident's exact service and detected_at timestamp. "
+            "Every time range must be no larger than that source's maximum_window_seconds.\n\n"
+            f"Plan queries for missing information (only use allowed fields above for each source):\n"
             f"{json.dumps(payload, indent=2)}"
         )
 

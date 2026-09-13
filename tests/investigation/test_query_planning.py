@@ -340,6 +340,48 @@ async def test_rejects_queries_exceeding_time_window(
     assert "exceeds maximum_window_seconds" in planner.last_warnings[0].message
 
 
+def test_since_until_time_window_is_also_validated(
+    sample_incident: IncidentSeed,
+    sample_budget: InvestigationBudget,
+) -> None:
+    catalog = SourceCapabilityCatalog(
+        incident_id=sample_incident.incident_id,
+        generated_at=sample_incident.received_at,
+        sources=[
+            SourceCapability(
+                source_type=SourceType.DEPLOYMENTS,
+                available=True,
+                supported_query_fields=["service", "since", "until", "limit"],
+                maximum_window_seconds=604800,
+                maximum_items=100,
+            )
+        ],
+    )
+    raw_plan = EvidenceQueryPlan(
+        incident_id=sample_incident.incident_id,
+        plan_id="plan_since_until_overflow",
+        round=1,
+        queries=[
+            EvidenceQueryPlanQuery(
+                query_id="qry_since_until_overflow",
+                source_type=SourceType.DEPLOYMENTS,
+                question="Fetch a year of deployments",
+                parameters={
+                    "service": "payment-api",
+                    "since": "2023-01-01T00:00:00Z",
+                    "until": "2023-12-31T23:59:59Z",
+                },
+            )
+        ],
+    )
+
+    planner = EvidenceQueryPlanner(provider=FakeReasoningProvider(custom_plan=raw_plan))
+    validated = planner.validate_plan(raw_plan, catalog, sample_budget)
+
+    assert validated.queries == []
+    assert any(w.code == INVALID_QUERY for w in planner.last_warnings)
+
+
 @pytest.mark.asyncio
 async def test_rejects_duplicate_queries_in_plan(
     sample_missing_info: MissingInformationAssessment,

@@ -281,7 +281,20 @@ class InvestigationRunner:
             llm_client = create_llm_client(provider_name=provider, model=llm_model)
 
         if llm_client is not None:
-            provider_inst = LLMReasoningProvider(client=llm_client)
+            if provider != "auto":
+                effective_provider = provider
+            elif llm_client.__class__.__name__ == "GeminiClient":
+                effective_provider = "gemini"
+            elif "11434" in getattr(llm_client, "base_url", ""):
+                effective_provider = "ollama"
+            else:
+                effective_provider = "openai"
+            provider_inst = LLMReasoningProvider(
+                client=llm_client,
+                provider_name=effective_provider,
+                model=getattr(llm_client, "model", llm_model or "unknown"),
+                max_retries=1 if effective_provider == "ollama" else 2,
+            )
             provider_name = f"Live LLM ({llm_client.model})"
         else:
             preset = SCENARIO_PRESET_MAP.get(scenario_name or "", "deployment-regression")

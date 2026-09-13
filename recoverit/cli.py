@@ -78,6 +78,9 @@ def display_results(res: InvestigationResult, report_path: str | None = None) ->
     summary_text.append(f"{res.service}\n", style="white")
     summary_text.append(f"Status: ", style="bold")
     summary_text.append(f"{res.status.upper()}\n", style=status_style)
+    if res.stop_reason:
+        summary_text.append("Stop Reason: ", style="bold")
+        summary_text.append(f"{res.stop_reason}\n", style="yellow")
     summary_text.append(f"Reasoning Provider: ", style="bold")
     summary_text.append(f"{res.provider_used}\n", style="magenta")
     summary_text.append(f"Analysis Duration: ", style="bold")
@@ -188,7 +191,13 @@ async def run_scenario_flow(
         progress.update(task, description="Building normalized timeline & ranking root-cause hypotheses...")
         await asyncio.sleep(0.2)
 
-    console.print("\n[bold green][OK] Investigation complete![/bold green]\n")
+    if res.status == "completed":
+        console.print("\n[bold green]Investigation completed successfully.[/bold green]\n")
+    else:
+        console.print(
+            f"\n[bold yellow]Investigation ended {res.status}: "
+            f"{res.stop_reason or 'no stop reason provided'}.[/bold yellow]\n"
+        )
     display_results(res, report_path=report)
 
 
@@ -236,7 +245,13 @@ async def scan_repo_flow(
         progress.update(task, description="Evaluating root-cause hypotheses and citations...")
         await asyncio.sleep(0.2)
 
-    console.print("\n[bold green]✓ Repository triage complete![/bold green]\n")
+    if res.status == "completed":
+        console.print("\n[bold green]Repository triage completed successfully.[/bold green]\n")
+    else:
+        console.print(
+            f"\n[bold yellow]Repository triage ended {res.status}: "
+            f"{res.stop_reason or 'no stop reason provided'}.[/bold yellow]\n"
+        )
     display_results(res, report_path=report)
 
 

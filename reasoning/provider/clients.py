@@ -9,6 +9,7 @@ import json
 import logging
 import os
 from typing import Any
+import urllib.request
 
 import httpx
 
@@ -26,11 +27,15 @@ class OpenAICompatibleClient(LLMClient):
         base_url: str = "https://api.openai.com/v1",
         model: str = "gpt-4o-mini",
         timeout: float = 60.0,
+        reasoning_effort: str | None = None,
+        max_tokens: int | None = None,
     ) -> None:
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout = timeout
+        self.reasoning_effort = reasoning_effort
+        self.max_tokens = max_tokens
 
     async def complete(
         self,
@@ -49,6 +54,10 @@ class OpenAICompatibleClient(LLMClient):
             "messages": messages,
             "temperature": temperature,
         }
+        if self.reasoning_effort is not None:
+            payload["reasoning_effort"] = self.reasoning_effort
+        if self.max_tokens is not None:
+            payload["max_tokens"] = self.max_tokens
 
         # Enable structured JSON output if schema provided or json output requested
         if json_schema:
@@ -178,11 +187,30 @@ class GeminiClient(LLMClient):
         )
 
 
-def is_ollama_available(host: str = "http://localhost:11434") -> bool:
+def _ollama_api_root(host: str | None = None) -> str:
+    """Normalize Ollama's native API root from either native or /v1 URLs."""
+    value = (host or os.environ.get("OLLAMA_HOST") or "http://localhost:11434").rstrip("/")
+    if value.endswith("/v1"):
+        value = value[:-3]
+    if value.endswith("/api"):
+        value = value[:-4]
+    return value.rstrip("/")
+
+
+def get_ollama_models(host: str | None = None) -> list[str]:
+    """Return locally installed Ollama model names, or an empty list if unavailable."""
+    try:
+        with urllib.request.urlopen(f"{_ollama_api_root(host)}/api/tags", timeout=2.0) as response:
+            data = json.load(response)
+        return [str(item["name"]) for item in data.get("models", []) if item.get("name")]
+    except Exception:
+        return []
+
+
+def is_ollama_available(host: str | None = None) -> bool:
     """Check whether local Ollama daemon is reachable."""
     try:
-        import urllib.request
-        with urllib.request.urlopen(f"{host}/api/tags", timeout=1.5) as r:
+        with urllib.request.urlopen(f"{_ollama_api_root(host)}/api/tags", timeout=1.5) as r:
             return r.status == 200
     except Exception:
         return False
@@ -217,11 +245,23 @@ def create_llm_client(
         return OpenAICompatibleClient(api_key=key, model=model or "gpt-4o-mini")
 
     if prov == "ollama":
+        ollama_root = _ollama_api_root(base_url)
+        installed_models = get_ollama_models(ollama_root)
+        if not installed_models:
+            raise RuntimeError(f"Ollama is not reachable at {ollama_root} or has no installed models.")
+        selected_model = model or os.environ.get("OLLAMA_MODEL") or installed_models[0]
+        if selected_model not in installed_models:
+            raise ValueError(
+                f"Ollama model '{selected_model}' is not installed. "
+                f"Available models: {', '.join(installed_models)}"
+            )
         return OpenAICompatibleClient(
             api_key="ollama",
-            base_url=base_url or os.environ.get("OLLAMA_HOST", "http://localhost:11434/v1"),
-            model=model or os.environ.get("OLLAMA_MODEL", "qwen2.5:3b"),
-            timeout=120.0,
+            base_url=f"{ollama_root}/v1",
+            model=selected_model,
+            timeout=90.0,
+            reasoning_effort="none",
+            max_tokens=1536,
         )
 
     # Auto-detection priority:
@@ -234,14 +274,23 @@ def create_llm_client(
         return OpenAICompatibleClient(model=model or "gpt-4o-mini")
 
     # 3. Local Ollama if daemon is active
-    if is_ollama_available():
-        target_model = model or os.environ.get("OLLAMA_MODEL", "qwen2.5:3b")
-        logger.info("Auto-detected local Ollama instance on http://localhost:11434 (model: %s)", target_model)
+    ollama_root = _ollama_api_root()
+    if is_ollama_available(ollama_root):
+        installed_models = get_ollama_models(ollama_root)
+        target_model = model or os.environ.get("OLLAMA_MODEL") or installed_models[0]
+        if target_model not in installed_models:
+            raise ValueError(
+                f"Ollama model '{target_model}' is not installed. "
+                f"Available models: {', '.join(installed_models)}"
+            )
+        logger.info("Auto-detected local Ollama instance on %s (model: %s)", ollama_root, target_model)
         return OpenAICompatibleClient(
             api_key="ollama",
-            base_url="http://localhost:11434/v1",
+            base_url=f"{ollama_root}/v1",
             model=target_model,
-            timeout=120.0,
+            timeout=90.0,
+            reasoning_effort="none",
+            max_tokens=1536,
         )
 
     return None

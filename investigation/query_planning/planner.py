@@ -337,10 +337,12 @@ class EvidenceQueryPlanner:
             except (ValueError, TypeError):
                 return None
 
-        if "start_time" in parameters and "end_time" in parameters:
+        start_value = parameters.get("start_time", parameters.get("since"))
+        end_value = parameters.get("end_time", parameters.get("until"))
+        if start_value is not None and end_value is not None:
             try:
-                st = parameters["start_time"]
-                et = parameters["end_time"]
+                st = start_value
+                et = end_value
                 start_dt = (
                     datetime.fromisoformat(st.replace("Z", "+00:00"))
                     if isinstance(st, str)
