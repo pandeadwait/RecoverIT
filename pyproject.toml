@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "recoverit"
 version = "0.1.0"
-description = "Autonomous CI/CD Incident Triager & Self-Healer"
+description = "Source-neutral CI/CD incident investigation and hypothesis ranking"
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.0,<3.0",
@@ -21,4 +21,7 @@ testpaths = ["tests"]
 pythonpath = ["."]
 
 [tool.setuptools.packages.find]
-include = ["contracts*", "ingestion*", "collectors*"]
+include = ["contracts*", "ingestion*", "collectors*", "evidence*", "timeline*", "investigation*", "reasoning*"]
+
+[tool.unittest]
+start-directory = "tests"

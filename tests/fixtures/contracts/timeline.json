@@ -1,0 +1,39 @@
+{
+  "incident_id": "inc_001",
+  "events": [
+    {
+      "schema_version": "1.0",
+      "timeline_event_id": "tle_300",
+      "incident_id": "inc_001",
+      "event_time": "2026-09-12T10:25:15Z",
+      "time_uncertainty_ms": 0,
+      "category": "deployment",
+      "title": "Payment API deployment completed",
+      "service": "payment-api",
+      "evidence_ids": ["ev_200"]
+    },
+    {
+      "schema_version": "1.0",
+      "timeline_event_id": "tle_301",
+      "incident_id": "inc_001",
+      "event_time": "2026-09-12T10:27:15Z",
+      "time_uncertainty_ms": 0,
+      "category": "symptom",
+      "title": "Database connection timeouts began",
+      "service": "payment-api",
+      "evidence_ids": ["ev_201"]
+    }
+  ],
+  "relationships": [
+    {
+      "schema_version": "1.0",
+      "relationship_id": "rel_401",
+      "incident_id": "inc_001",
+      "from_event_id": "tle_300",
+      "to_event_id": "tle_301",
+      "relationship_type": "PRECEDES",
+      "delta_ms": 120000,
+      "created_by": "deterministic"
+    }
+  ]
+}

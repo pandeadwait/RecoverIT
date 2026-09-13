@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0",
+  "relationship_id": "rel_401",
+  "incident_id": "inc_001",
+  "from_event_id": "tle_300",
+  "to_event_id": "tle_301",
+  "relationship_type": "PRECEDES",
+  "delta_ms": 120000,
+  "created_by": "deterministic"
+}

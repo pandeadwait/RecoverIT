@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "incident_id": "inc_001",
+  "external_alert_id": "alert-001",
+  "service": "payment-api",
+  "environment": "simulation",
+  "severity": "critical",
+  "detected_at": "2026-09-12T10:30:00",
+  "received_at": "2026-09-12T10:30:02Z",
+  "summary": "HTTP 500 rate exceeded threshold",
+  "labels": {"region": "local"}
+}

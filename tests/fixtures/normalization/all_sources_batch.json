@@ -1,0 +1,151 @@
+{
+  "schema_version": "1.0",
+  "incident_id": "inc_001",
+  "plan_id": "plan_phase_3",
+  "batch_id": "batch_phase_3",
+  "collected_at": "2026-09-12T10:31:00Z",
+  "results": [
+    {
+      "query_id": "qry_logs",
+      "source_type": "logs",
+      "source_adapter": "fixture-log-adapter",
+      "source_status": "ok",
+      "truncated": false,
+      "records": [
+        {
+          "source_record_id": "log-1",
+          "event_time": "2026-09-12T15:57:15+05:30",
+          "observed_at": "2026-09-12T10:27:16Z",
+          "content_type": "application_log",
+          "payload": {
+            "level": "ERROR",
+            "message": "Database connection timeout",
+            "service": "payments",
+            "resource": "pay-1",
+            "error_signature": "db_timeout"
+          }
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "query_id": "qry_metrics",
+      "source_type": "metrics",
+      "source_adapter": "fixture-metric-adapter",
+      "source_status": "ok",
+      "truncated": false,
+      "records": [
+        {
+          "source_record_id": "metric-1",
+          "event_time": "2026-09-12T10:28:00Z",
+          "observed_at": "2026-09-12T10:28:05Z",
+          "content_type": "metric_sample",
+          "payload": {
+            "metric": "http_500_rate",
+            "value": 0.42,
+            "unit": "ratio",
+            "service": "payments"
+          }
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "query_id": "qry_changes",
+      "source_type": "changes",
+      "source_adapter": "fixture-change-adapter",
+      "source_status": "ok",
+      "truncated": false,
+      "records": [
+        {
+          "source_record_id": "change-1",
+          "event_time": "2026-09-12T10:10:00Z",
+          "observed_at": "2026-09-12T10:10:02Z",
+          "content_type": "git_change",
+          "payload": {
+            "revision": "abc123",
+            "title": "Update database endpoint",
+            "author": "fixture-user",
+            "service": "payments"
+          }
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "query_id": "qry_deployments",
+      "source_type": "deployments",
+      "source_adapter": "fixture-deployment-adapter",
+      "source_status": "ok",
+      "truncated": false,
+      "records": [
+        {
+          "source_record_id": "deploy-1",
+          "event_time": "2026-09-12T10:20:00Z",
+          "observed_at": "2026-09-12T10:20:03Z",
+          "content_type": "deployment",
+          "payload": {
+            "deployment_id": "deploy-1",
+            "revision": "abc123",
+            "status": "SUCCEEDED",
+            "service": "payments",
+            "event_time_approximate": true,
+            "time_uncertainty_ms": 1000
+          }
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "query_id": "qry_pipelines",
+      "source_type": "pipelines",
+      "source_adapter": "fixture-pipeline-adapter",
+      "source_status": "ok",
+      "truncated": false,
+      "records": [
+        {
+          "source_record_id": "pipeline-1",
+          "event_time": "2026-09-12T10:15:00Z",
+          "observed_at": "2026-09-12T10:15:01Z",
+          "content_type": "pipeline_run",
+          "payload": {
+            "run_id": "pipeline-1",
+            "revision": "abc123",
+            "status": "PASSED",
+            "stage": "deploy",
+            "service": "payments"
+          }
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "query_id": "qry_configuration",
+      "source_type": "configuration",
+      "source_adapter": "fixture-configuration-adapter",
+      "source_status": "partial",
+      "truncated": true,
+      "records": [
+        {
+          "source_record_id": "config-1",
+          "observed_at": "2026-09-12T10:18:01Z",
+          "content_type": "configuration_change",
+          "payload": {
+            "change_id": "config-1",
+            "keys": ["DATABASE_HOST"],
+            "summary": "Database host configuration changed",
+            "service": "payments"
+          }
+        }
+      ],
+      "warnings": [
+        {
+          "schema_version": "1.0",
+          "code": "partial_result",
+          "message": "Fixture result reached its item limit."
+        }
+      ]
+    }
+  ],
+  "errors": []
+}

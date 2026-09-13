@@ -1,0 +1,438 @@
+[
+  {
+    "name": "deployment_configuration_regression",
+    "incident": {
+      "schema_version": "1.0",
+      "incident_id": "inc_deployment_regression",
+      "external_alert_id": "alert-deployment-regression",
+      "service": "checkout-api",
+      "environment": "simulation",
+      "severity": "critical",
+      "detected_at": "2026-09-12T11:30:00Z",
+      "received_at": "2026-09-12T11:30:02Z",
+      "summary": "Checkout errors followed a configuration deployment",
+      "labels": {"scenario": "deployment_configuration_regression"}
+    },
+    "batch": {
+      "schema_version": "1.0",
+      "incident_id": "inc_deployment_regression",
+      "plan_id": "plan-deployment-regression",
+      "batch_id": "batch-deployment-regression",
+      "collected_at": "2026-09-12T11:31:00Z",
+      "results": [
+        {
+          "query_id": "query-change-regression",
+          "source_type": "changes",
+          "source_adapter": "recorded-change-adapter",
+          "source_status": "ok",
+          "truncated": false,
+          "records": [{
+            "source_record_id": "change-bad-config",
+            "event_time": "2026-09-12T11:10:00Z",
+            "observed_at": "2026-09-12T11:10:02Z",
+            "content_type": "git_change",
+            "payload": {
+              "revision": "badcfg42",
+              "title": "Point checkout at the new tax endpoint",
+              "service": "checkout-api"
+            }
+          }],
+          "warnings": []
+        },
+        {
+          "query_id": "query-deployment-regression",
+          "source_type": "deployments",
+          "source_adapter": "recorded-deployment-adapter",
+          "source_status": "ok",
+          "truncated": false,
+          "records": [{
+            "source_record_id": "deploy-bad-config",
+            "event_time": "2026-09-12T11:20:00Z",
+            "observed_at": "2026-09-12T11:20:03Z",
+            "content_type": "deployment",
+            "payload": {
+              "deployment_id": "deploy-bad-config",
+              "revision": "badcfg42",
+              "status": "SUCCEEDED",
+              "service": "checkout-api"
+            }
+          }],
+          "warnings": []
+        },
+        {
+          "query_id": "query-config-regression",
+          "source_type": "configuration",
+          "source_adapter": "recorded-configuration-adapter",
+          "source_status": "ok",
+          "truncated": false,
+          "records": [{
+            "source_record_id": "config-tax-endpoint",
+            "event_time": "2026-09-12T11:19:30Z",
+            "observed_at": "2026-09-12T11:19:31Z",
+            "content_type": "configuration_change",
+            "payload": {
+              "change_id": "config-tax-endpoint",
+              "revision": "badcfg42",
+              "keys": ["TAX_ENDPOINT"],
+              "summary": "Tax endpoint configuration changed",
+              "service": "checkout-api"
+            }
+          }],
+          "warnings": []
+        }
+      ],
+      "errors": []
+    },
+    "expected": {
+      "snapshot_id": "ctx_060414e6f3b0e4743f9f19c3",
+      "revision": 1,
+      "evidence_count": 3,
+      "warning_count": 0,
+      "timeline_source_order": ["changes", "configuration", "deployments"],
+      "required_relationships": ["DEPLOYED_FROM"],
+      "forbidden_relationships": ["CAUSES", "SUPPORTS", "CONTRADICTS"],
+      "coverage": {
+        "logs": "not_queried",
+        "metrics": "not_queried",
+        "changes": "available",
+        "deployments": "available",
+        "pipelines": "not_queried",
+        "configuration": "available"
+      }
+    }
+  },
+  {
+    "name": "memory_exhaustion",
+    "incident": {
+      "schema_version": "1.0",
+      "incident_id": "inc_memory_exhaustion",
+      "external_alert_id": "alert-memory-exhaustion",
+      "service": "catalog-api",
+      "environment": "simulation",
+      "severity": "critical",
+      "detected_at": "2026-09-12T12:10:00Z",
+      "received_at": "2026-09-12T12:10:01Z",
+      "summary": "Catalog process exceeded its memory limit",
+      "labels": {"scenario": "memory_exhaustion"}
+    },
+    "batch": {
+      "schema_version": "1.0",
+      "incident_id": "inc_memory_exhaustion",
+      "plan_id": "plan-memory-exhaustion",
+      "batch_id": "batch-memory-exhaustion",
+      "collected_at": "2026-09-12T12:11:00Z",
+      "results": [
+        {
+          "query_id": "query-memory-metric",
+          "source_type": "metrics",
+          "source_adapter": "recorded-metric-adapter",
+          "source_status": "ok",
+          "truncated": false,
+          "records": [{
+            "source_record_id": "metric-memory-high",
+            "event_time": "2026-09-12T12:09:30Z",
+            "observed_at": "2026-09-12T12:09:31Z",
+            "content_type": "metric_sample",
+            "payload": {"metric": "memory_usage", "value": 99.8, "unit": "percent", "service": "catalog-api"}
+          }],
+          "warnings": []
+        },
+        {
+          "query_id": "query-oom-log",
+          "source_type": "logs",
+          "source_adapter": "recorded-log-adapter",
+          "source_status": "ok",
+          "truncated": false,
+          "records": [{
+            "source_record_id": "log-oom-kill",
+            "event_time": "2026-09-12T12:09:45Z",
+            "observed_at": "2026-09-12T12:09:46Z",
+            "content_type": "application_log",
+            "payload": {
+              "level": "ERROR",
+              "message": "Worker terminated after out-of-memory condition",
+              "service": "catalog-api",
+              "api_key": "phase9-memory-secret-9f3a"
+            }
+          }],
+          "warnings": []
+        }
+      ],
+      "errors": []
+    },
+    "expected": {
+      "snapshot_id": "ctx_81c95788ff4bbfc81aa0aa37",
+      "revision": 1,
+      "evidence_count": 2,
+      "warning_count": 1,
+      "timeline_source_order": ["metrics", "logs"],
+      "required_relationships": ["PRECEDES"],
+      "forbidden_relationships": ["CAUSES", "SUPPORTS", "CONTRADICTS", "DEPLOYED_FROM"],
+      "coverage": {
+        "logs": "available",
+        "metrics": "available",
+        "changes": "not_queried",
+        "deployments": "not_queried",
+        "pipelines": "not_queried",
+        "configuration": "not_queried"
+      },
+      "forbidden_values": ["phase9-memory-secret-9f3a"]
+    }
+  },
+  {
+    "name": "dependency_incompatibility",
+    "incident": {
+      "schema_version": "1.0",
+      "incident_id": "inc_dependency_incompatibility",
+      "external_alert_id": "alert-dependency-incompatibility",
+      "service": "report-api",
+      "environment": "simulation",
+      "severity": "warning",
+      "detected_at": "2026-09-12T13:20:00Z",
+      "received_at": "2026-09-12T13:20:02Z",
+      "summary": "Report service failed after a dependency update",
+      "labels": {"scenario": "dependency_incompatibility"}
+    },
+    "batch": {
+      "schema_version": "1.0",
+      "incident_id": "inc_dependency_incompatibility",
+      "plan_id": "plan-dependency-incompatibility",
+      "batch_id": "batch-dependency-incompatibility",
+      "collected_at": "2026-09-12T13:21:00Z",
+      "results": [
+        {
+          "query_id": "query-dependency-change",
+          "source_type": "changes",
+          "source_adapter": "recorded-change-adapter",
+          "source_status": "ok",
+          "truncated": false,
+          "records": [{
+            "source_record_id": "change-dependency-44",
+            "event_time": "2026-09-12T13:00:00Z",
+            "observed_at": "2026-09-12T13:00:01Z",
+            "content_type": "git_change",
+            "payload": {"revision": "dep44", "title": "Upgrade serializer dependency", "service": "report-api"}
+          }],
+          "warnings": []
+        },
+        {
+          "query_id": "query-dependency-pipeline",
+          "source_type": "pipelines",
+          "source_adapter": "recorded-pipeline-adapter",
+          "source_status": "ok",
+          "truncated": false,
+          "records": [{
+            "source_record_id": "pipeline-dependency-44",
+            "event_time": "2026-09-12T13:05:00Z",
+            "observed_at": "2026-09-12T13:05:02Z",
+            "content_type": "pipeline_run",
+            "payload": {"run_id": "pipeline-dependency-44", "revision": "dep44", "status": "FAILED", "stage": "test", "service": "report-api"}
+          }],
+          "warnings": []
+        },
+        {
+          "query_id": "query-dependency-log",
+          "source_type": "logs",
+          "source_adapter": "recorded-log-adapter",
+          "source_status": "ok",
+          "truncated": false,
+          "records": [{
+            "source_record_id": "log-dependency-error",
+            "event_time": "2026-09-12T13:06:00Z",
+            "observed_at": "2026-09-12T13:06:01Z",
+            "content_type": "application_log",
+            "payload": {"level": "ERROR", "message": "Serializer method signature is incompatible", "service": "report-api", "error_signature": "dependency_incompatible"}
+          }],
+          "warnings": []
+        }
+      ],
+      "errors": []
+    },
+    "expected": {
+      "snapshot_id": "ctx_819f18a13ec81e9a3ce4d03c",
+      "revision": 1,
+      "evidence_count": 3,
+      "warning_count": 0,
+      "timeline_source_order": ["changes", "pipelines", "logs"],
+      "required_relationships": ["PRECEDES"],
+      "forbidden_relationships": ["CAUSES", "SUPPORTS", "CONTRADICTS", "DEPLOYED_FROM"],
+      "coverage": {
+        "logs": "available",
+        "metrics": "not_queried",
+        "changes": "available",
+        "deployments": "not_queried",
+        "pipelines": "available",
+        "configuration": "not_queried"
+      }
+    }
+  },
+  {
+    "name": "database_outage",
+    "incident": {
+      "schema_version": "1.0",
+      "incident_id": "inc_database_outage",
+      "external_alert_id": "alert-database-outage",
+      "service": "billing-api",
+      "environment": "simulation",
+      "severity": "critical",
+      "detected_at": "2026-09-12T14:15:00Z",
+      "received_at": "2026-09-12T14:15:01Z",
+      "summary": "Billing database connections failed",
+      "labels": {"scenario": "database_outage"}
+    },
+    "batch": {
+      "schema_version": "1.0",
+      "incident_id": "inc_database_outage",
+      "plan_id": "plan-database-outage",
+      "batch_id": "batch-database-outage",
+      "collected_at": "2026-09-12T14:16:00Z",
+      "results": [
+        {
+          "query_id": "query-database-errors",
+          "source_type": "metrics",
+          "source_adapter": "recorded-metric-adapter",
+          "source_status": "ok",
+          "truncated": false,
+          "records": [{
+            "source_record_id": "metric-db-errors",
+            "event_time": "2026-09-12T14:14:20Z",
+            "observed_at": "2026-09-12T14:14:21Z",
+            "content_type": "metric_sample",
+            "payload": {"metric": "database_connection_errors", "value": 87, "unit": "count", "service": "billing-api"}
+          }],
+          "warnings": []
+        },
+        {
+          "query_id": "query-database-log",
+          "source_type": "logs",
+          "source_adapter": "recorded-log-adapter",
+          "source_status": "ok",
+          "truncated": false,
+          "records": [{
+            "source_record_id": "log-db-unreachable",
+            "event_time": "2026-09-12T14:14:30Z",
+            "observed_at": "2026-09-12T14:14:31Z",
+            "content_type": "application_log",
+            "payload": {"level": "ERROR", "message": "Database unreachable at postgres://phase9-db-user:phase9-db-secret@db.internal/billing", "service": "billing-api"}
+          }],
+          "warnings": []
+        },
+        {
+          "query_id": "query-database-config",
+          "source_type": "configuration",
+          "source_adapter": "recorded-configuration-adapter",
+          "source_status": "unavailable",
+          "truncated": false,
+          "records": [],
+          "warnings": []
+        }
+      ],
+      "errors": []
+    },
+    "expected": {
+      "snapshot_id": "ctx_4c238e2c8cec9113ff378449",
+      "revision": 1,
+      "evidence_count": 2,
+      "warning_count": 1,
+      "timeline_source_order": ["metrics", "logs"],
+      "required_relationships": ["PRECEDES"],
+      "forbidden_relationships": ["CAUSES", "SUPPORTS", "CONTRADICTS", "DEPLOYED_FROM"],
+      "coverage": {
+        "logs": "available",
+        "metrics": "available",
+        "changes": "not_queried",
+        "deployments": "not_queried",
+        "pipelines": "not_queried",
+        "configuration": "unavailable"
+      },
+      "forbidden_values": ["phase9-db-user", "phase9-db-secret"]
+    }
+  },
+  {
+    "name": "coincidental_deployment_not_causal",
+    "incident": {
+      "schema_version": "1.0",
+      "incident_id": "inc_coincidental_deployment",
+      "external_alert_id": "alert-coincidental-deployment",
+      "service": "search-api",
+      "environment": "simulation",
+      "severity": "warning",
+      "detected_at": "2026-09-12T15:05:00Z",
+      "received_at": "2026-09-12T15:05:01Z",
+      "summary": "Search latency rose near an unrelated deployment",
+      "labels": {"scenario": "coincidental_deployment_not_causal"}
+    },
+    "batch": {
+      "schema_version": "1.0",
+      "incident_id": "inc_coincidental_deployment",
+      "plan_id": "plan-coincidental-deployment",
+      "batch_id": "batch-coincidental-deployment",
+      "collected_at": "2026-09-12T15:06:00Z",
+      "results": [
+        {
+          "query_id": "query-unrelated-change",
+          "source_type": "changes",
+          "source_adapter": "recorded-change-adapter",
+          "source_status": "ok",
+          "truncated": false,
+          "records": [{
+            "source_record_id": "change-unrelated",
+            "event_time": "2026-09-12T14:55:00Z",
+            "observed_at": "2026-09-12T14:55:01Z",
+            "content_type": "git_change",
+            "payload": {"revision": "revision-a", "title": "Update documentation", "service": "search-api"}
+          }],
+          "warnings": []
+        },
+        {
+          "query_id": "query-unrelated-deployment",
+          "source_type": "deployments",
+          "source_adapter": "recorded-deployment-adapter",
+          "source_status": "ok",
+          "truncated": false,
+          "records": [{
+            "source_record_id": "deploy-unrelated",
+            "event_time": "2026-09-12T15:00:00Z",
+            "observed_at": "2026-09-12T15:00:01Z",
+            "content_type": "deployment",
+            "payload": {"deployment_id": "deploy-unrelated", "revision": "revision-b", "status": "SUCCEEDED", "service": "search-api"}
+          }],
+          "warnings": []
+        },
+        {
+          "query_id": "query-latency-log",
+          "source_type": "logs",
+          "source_adapter": "recorded-log-adapter",
+          "source_status": "ok",
+          "truncated": false,
+          "records": [{
+            "source_record_id": "log-search-latency",
+            "event_time": "2026-09-12T15:00:00Z",
+            "observed_at": "2026-09-12T15:00:01Z",
+            "content_type": "application_log",
+            "payload": {"level": "WARN", "message": "Search dependency latency exceeded threshold", "service": "search-api"}
+          }],
+          "warnings": []
+        }
+      ],
+      "errors": []
+    },
+    "expected": {
+      "snapshot_id": "ctx_e9a85beebcb93fed442fddbf",
+      "revision": 1,
+      "evidence_count": 3,
+      "warning_count": 0,
+      "timeline_source_order": ["changes", "deployments", "logs"],
+      "required_relationships": ["COINCIDES_WITH"],
+      "forbidden_relationships": ["CAUSES", "SUPPORTS", "CONTRADICTS", "DEPLOYED_FROM"],
+      "coverage": {
+        "logs": "available",
+        "metrics": "not_queried",
+        "changes": "available",
+        "deployments": "available",
+        "pipelines": "not_queried",
+        "configuration": "not_queried"
+      }
+    }
+  }
+]

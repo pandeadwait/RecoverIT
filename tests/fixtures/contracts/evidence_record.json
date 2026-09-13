@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "evidence_id": "ev_201",
+  "incident_id": "inc_001",
+  "source_type": "logs",
+  "evidence_type": "error_event",
+  "service": "payment-api",
+  "event_time": "2026-09-12T10:27:15Z",
+  "observed_at": "2026-09-12T10:27:16Z",
+  "collected_at": "2026-09-12T10:31:00Z",
+  "summary": "Payment API logged a database connection timeout.",
+  "attributes": {"error_signature": "database_connection_timeout", "level": "error"},
+  "provenance": {
+    "batch_id": "batch_009",
+    "query_id": "qry_101",
+    "source_record_id": "log-998",
+    "source_adapter": "fixture-log-adapter",
+    "raw_payload_hash": "sha256:76fd3e6c9706a7b0"
+  },
+  "quality": {"reliability": "high", "freshness_seconds": 224, "truncated_source": false, "redactions_applied": false}
+}

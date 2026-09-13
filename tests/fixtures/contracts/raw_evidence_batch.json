@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0",
+  "incident_id": "inc_001",
+  "plan_id": "plan_002",
+  "batch_id": "batch_009",
+  "collected_at": "2026-09-12T10:31:00Z",
+  "results": [
+    {
+      "query_id": "qry_101",
+      "source_type": "logs",
+      "source_adapter": "fixture-log-adapter",
+      "source_status": "ok",
+      "truncated": false,
+      "records": [
+        {
+          "source_record_id": "log-998",
+          "event_time": "2026-09-12T10:27:15Z",
+          "observed_at": "2026-09-12T10:27:16Z",
+          "content_type": "application_log",
+          "payload": {"level": "error", "message": "Database connection timeout", "service": "payment-api"}
+        }
+      ],
+      "warnings": []
+    }
+  ],
+  "errors": []
+}
