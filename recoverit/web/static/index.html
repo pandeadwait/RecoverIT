@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RecoverIT — Autonomous CI/CD Incident Triager & Self-Healer</title>
+  <meta name="description" content="AI-driven DevOps incident investigation platform for root-cause diagnosis across code, logs, and telemetry.">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand">
+        <div class="logo-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">RecoverIT</h1>
+          <p class="brand-tagline">Autonomous CI/CD Incident Triager & Self-Healer</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div class="status-indicator">
+          <span class="status-dot"></span>
+          <span class="status-text">AGENT ACTIVE • MULTI-SOURCE MONITORING</span>
+        </div>
+        <div class="mode-select-wrap">
+          <label for="mode-select">AI Mode:</label>
+          <select id="mode-select">
+            <option value="auto">Auto (Live LLM or Preset)</option>
+            <option value="offline">Offline Preset (Zero-Token)</option>
+            <option value="live">Live LLM (Ollama/Gemini/OpenAI)</option>
+          </select>
+        </div>
+        <div class="mode-select-wrap">
+          <label for="provider-select">Provider:</label>
+          <select id="provider-select">
+            <option value="auto">Auto Detect</option>
+            <option value="ollama">Ollama (Local)</option>
+            <option value="gemini">Google Gemini</option>
+            <option value="openai">OpenAI</option>
+            <option value="offline">Deterministic Preset</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-container">
+    <!-- Incident Control Panel -->
+    <section class="panel control-panel">
+      <div class="panel-header">
+        <div class="section-title-wrap">
+          <span class="section-badge">TRIGGER</span>
+          <h2>Select Incident or Local Codebase</h2>
+        </div>
+        <div class="tab-buttons">
+          <button id="tab-preset" class="tab-btn active">Benchmark Scenarios</button>
+          <button id="tab-custom" class="tab-btn">Inspect Local Codebase</button>
+        </div>
+      </div>
+
+      <!-- Preset Tab Content -->
+      <div id="view-preset" class="tab-content active">
+        <div class="control-row">
+          <div class="form-group flex-2">
+            <label for="scenario-select">Incident Benchmark Preset</label>
+            <select id="scenario-select"></select>
+          </div>
+          <div class="form-group flex-1 action-group">
+            <label>&nbsp;</label>
+            <button id="btn-run" class="btn btn-primary">
+              <span class="btn-icon">⚡</span>
+              <span>Launch Autonomous Investigation</span>
+            </button>
+          </div>
+        </div>
+        <div id="scenario-desc" class="scenario-banner">
+          <div class="scenario-meta">
+            <span id="scen-category" class="badge badge-purple">Configuration</span>
+            <span id="scen-service" class="badge badge-blue">Service: payment-api</span>
+            <span id="scen-severity" class="badge badge-red">CRITICAL</span>
+          </div>
+          <p id="scen-text" class="scenario-text">Loading scenario description...</p>
+        </div>
+      </div>
+
+      <!-- Custom Codebase Tab Content -->
+      <div id="view-custom" class="tab-content">
+        <div class="control-row" style="margin-bottom: 1rem;">
+          <div class="form-group flex-3">
+            <label for="custom-alert">Incident Symptom / Alert Title</label>
+            <input type="text" id="custom-alert" placeholder="e.g. [P1 CRITICAL] HTTP 500 Spike on payment-api (>35% failure rate)" value="[P1 CRITICAL] HTTP 500 Spike on payment-api (>35% failure rate)">
+          </div>
+        </div>
+        <div class="control-row">
+          <div class="form-group flex-2">
+            <label for="custom-repo">Local Git Repository Path</label>
+            <input type="text" id="custom-repo" placeholder="e.g. ./examples/demo_service" value="./examples/demo_service">
+          </div>
+          <div class="form-group flex-2">
+            <label for="custom-logs">Application Log File Path (Optional)</label>
+            <input type="text" id="custom-logs" placeholder="e.g. ./examples/demo_service/logs/payment-api.log" value="./examples/demo_service/logs/payment-api.log">
+          </div>
+          <div class="form-group flex-1">
+            <label for="custom-service">Service Name</label>
+            <input type="text" id="custom-service" placeholder="service-name" value="payment-api">
+          </div>
+          <div class="form-group flex-1 action-group">
+            <label>&nbsp;</label>
+            <button id="btn-run-custom" class="btn btn-primary">
+              <span class="btn-icon">🔍</span>
+              <span>Scan & Investigate</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Investigation Pipeline Stepper -->
+    <section id="pipeline-stepper" class="stepper-section hidden">
+      <div class="stepper-header">
+        <h3>Autonomous Multi-Round Investigation Pipeline</h3>
+        <span id="stepper-status" class="badge badge-pulse">ANALYZING</span>
+      </div>
+      <div class="stepper-track">
+        <div class="step-item active" id="step-1">
+          <div class="step-circle">1</div>
+          <span class="step-label">Alert Ingested</span>
+        </div>
+        <div class="step-connector"></div>
+        <div class="step-item" id="step-2">
+          <div class="step-circle">2</div>
+          <span class="step-label">Gap Assessment</span>
+        </div>
+        <div class="step-connector"></div>
+        <div class="step-item" id="step-3">
+          <div class="step-circle">3</div>
+          <span class="step-label">6 Sources Queried</span>
+        </div>
+        <div class="step-connector"></div>
+        <div class="step-item" id="step-4">
+          <div class="step-circle">4</div>
+          <span class="step-label">Timeline Built</span>
+        </div>
+        <div class="step-connector"></div>
+        <div class="step-item" id="step-5">
+          <div class="step-circle">5</div>
+          <span class="step-label">Hypotheses Tested</span>
+        </div>
+        <div class="step-connector"></div>
+        <div class="step-item" id="step-6">
+          <div class="step-circle">6</div>
+          <span class="step-label">Root Causes Ranked</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Results Section -->
+    <section id="results-section" class="results-section hidden">
+      <!-- Metrics Strip -->
+      <div class="metrics-strip">
+        <div class="metric-card">
+          <span class="metric-label">INCIDENT ID</span>
+          <span id="res-incident-id" class="metric-value font-mono">inc-001</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">TARGET SERVICE</span>
+          <span id="res-service" class="metric-value">payment-api</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">TRIAGE STATUS</span>
+          <span id="res-status" class="metric-value text-green">COMPLETED</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">INVESTIGATION LATENCY</span>
+          <span id="res-latency" class="metric-value text-cyan">0.02s</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">REASONING ENGINE</span>
+          <span id="res-provider" class="metric-value text-purple">AI Model</span>
+        </div>
+      </div>
+
+      <!-- Main Results Grid -->
+      <div class="results-grid">
+        <!-- Left: Diagnosis & Hypotheses -->
+        <div class="grid-col left-col">
+          <div class="col-header">
+            <div class="col-title-wrap">
+              <span class="section-badge badge-green">DIAGNOSIS</span>
+              <h3>Ranked Root-Cause Hypotheses</h3>
+            </div>
+            <span class="col-subtitle">Evidence-backed causal explanations with citations</span>
+          </div>
+
+          <div id="hypotheses-container" class="hypotheses-list">
+            <!-- Hypotheses cards injected by JS -->
+          </div>
+        </div>
+
+        <!-- Right: Incident Chronology & Git Diffs -->
+        <div class="grid-col right-col">
+          <div class="col-header">
+            <div class="col-title-wrap">
+              <span class="section-badge badge-blue">CHRONOLOGY</span>
+              <h3>Reconstructed Event Timeline</h3>
+            </div>
+            <span class="col-subtitle">Normalized sequence of changes, logs, metrics & deploys</span>
+          </div>
+
+          <!-- Code Diff Panel (if available) -->
+          <div id="diff-panel" class="diff-container hidden">
+            <div class="diff-header">
+              <div class="diff-title">
+                <span class="diff-tag">GIT DIFF</span>
+                <span id="diff-commit-id" class="font-mono">Commit</span>
+              </div>
+              <span class="badge badge-purple">Associated Change</span>
+            </div>
+            <pre id="diff-content" class="diff-code font-mono"><code></code></pre>
+          </div>
+
+          <!-- Timeline list -->
+          <div id="timeline-container" class="timeline-list">
+            <!-- Timeline items injected by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Action Bar -->
+      <div class="report-actions-bar">
+        <div class="report-info">
+          <h4>Need to share these findings with your team?</h4>
+          <p>Export a full SRE Post-Mortem Incident Report with timeline and citations.</p>
+        </div>
+        <div class="action-buttons">
+          <button id="btn-copy-summary" class="btn btn-secondary">
+            📋 Copy Diagnosis Summary
+          </button>
+          <button id="btn-download-report" class="btn btn-primary">
+            📥 Download Post-Mortem Report (.md)
+          </button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <p>RecoverIT • Autonomous CI/CD Incident Triager & Self-Healer • Multi-Source AI Root-Cause Engine</p>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

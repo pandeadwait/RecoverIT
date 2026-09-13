@@ -107,10 +107,14 @@ class MissingInformationAssessor:
             # Validate priority
             priority = self._normalize_priority(item.priority)
 
-            # Filter candidate sources: must be present and available in catalog
-            available_candidates = [
-                s for s in item.candidate_sources if s in available_sources
-            ]
+            # Filter candidate sources: must be present and available in catalog.
+            # If the provider omitted candidate_sources or left it empty, consider all available sources.
+            if not item.candidate_sources:
+                available_candidates = list(available_sources)
+            else:
+                available_candidates = [
+                    s for s in item.candidate_sources if s in available_sources
+                ]
 
             if not available_candidates:
                 # If sources are in catalog but unavailable, or not in catalog at all,

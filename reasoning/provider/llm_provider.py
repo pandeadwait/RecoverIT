@@ -262,16 +262,51 @@ class LLMReasoningProvider:
             "You are an expert SRE incident investigator. Analyze the incident, "
             "established facts in the context snapshot, and available source capabilities. "
             "Identify what information is known and what critical questions must still be answered. "
-            "Return valid JSON matching the MissingInformationAssessment schema."
+            "For each item in missing_information, populate candidate_sources with relevant available "
+            "source types (e.g. 'changes', 'logs'). Return valid JSON matching the MissingInformationAssessment schema."
         )
 
-        return await self._execute_structured_call(
+        assessment: MissingInformationAssessment = await self._execute_structured_call(
             method="assess_missing_information",
             prompt_version=PROMPT_VERSION_ASSESS,
             prompt=prompt,
             system_instruction=system_instruction,
             target_model=MissingInformationAssessment,
         )
+
+        # Ensure candidate_sources are populated from available sources
+        available_sources = [
+            s.source_type for s in source_capabilities.sources if s.available
+        ]
+        updated_missing = []
+        for item in assessment.missing_information:
+            if not item.candidate_sources:
+                q_lower = (item.question + " " + item.reason).lower()
+                inferred = []
+                if any(w in q_lower for w in ["log", "error", "exception", "traceback", "500", "status", "fail"]):
+                    if SourceType.LOGS in available_sources:
+                        inferred.append(SourceType.LOGS)
+                if any(w in q_lower for w in ["change", "commit", "diff", "code", "author", "repo", "git", "recent"]):
+                    if SourceType.CHANGES in available_sources:
+                        inferred.append(SourceType.CHANGES)
+                if any(w in q_lower for w in ["metric", "rate", "spike", "cpu", "memory", "latency"]):
+                    if SourceType.METRICS in available_sources:
+                        inferred.append(SourceType.METRICS)
+                if any(w in q_lower for w in ["deploy", "release", "version"]):
+                    if SourceType.DEPLOYMENTS in available_sources:
+                        inferred.append(SourceType.DEPLOYMENTS)
+                if any(w in q_lower for w in ["config", "database.yaml", "setting", "env"]):
+                    if SourceType.CONFIGURATION in available_sources:
+                        inferred.append(SourceType.CONFIGURATION)
+                    elif SourceType.CHANGES in available_sources and SourceType.CHANGES not in inferred:
+                        inferred.append(SourceType.CHANGES)
+
+                final_sources = inferred if inferred else list(available_sources)
+                updated_missing.append(item.model_copy(update={"candidate_sources": final_sources}))
+            else:
+                updated_missing.append(item)
+
+        return assessment.model_copy(update={"missing_information": updated_missing})
 
     async def plan_queries(
         self,
@@ -297,13 +332,38 @@ class LLMReasoningProvider:
             "EvidenceQueryPlan schema."
         )
 
-        return await self._execute_structured_call(
+        plan: EvidenceQueryPlan = await self._execute_structured_call(
             method="plan_queries",
             prompt_version=PROMPT_VERSION_PLAN,
             prompt=prompt,
             system_instruction=system_instruction,
             target_model=EvidenceQueryPlan,
         )
+
+        # Normalize and filter parameters against capabilities to guarantee contract compliance
+        catalog_map = {s.source_type: s for s in source_capabilities.sources}
+        normalized_queries: list[EvidenceQueryPlanQuery] = []
+        for q in plan.queries:
+            cap = catalog_map.get(q.source_type)
+            if cap is not None:
+                supported = set(cap.supported_query_fields)
+                synonyms = {
+                    "service_name": "service",
+                    "max_results": "limit",
+                    "max_items": "limit",
+                    "start_date": "start_time",
+                    "end_date": "end_time",
+                }
+                new_params: dict[str, Any] = {}
+                for k, v in q.parameters.items():
+                    norm_k = synonyms.get(k, k)
+                    if norm_k in supported:
+                        new_params[norm_k] = v
+                normalized_queries.append(q.model_copy(update={"parameters": new_params}))
+            else:
+                normalized_queries.append(q)
+
+        return plan.model_copy(update={"queries": normalized_queries})
 
     async def generate_hypotheses(
         self,
@@ -542,8 +602,15 @@ class LLMReasoningProvider:
             },
             "active_hypotheses": [h.model_dump(mode="json") for h in active_hypotheses],
         }
+        available_source_types = [
+            (s.source_type.value if hasattr(s.source_type, "value") else str(s.source_type))
+            for s in source_capabilities.sources
+            if s.available
+        ]
         return (
             f"Prompt Version: {PROMPT_VERSION_ASSESS}\n"
+            f"Available source types in the catalog: {available_source_types}\n"
+            f"CRITICAL: In 'missing_information', specify relevant available source types in 'candidate_sources' (e.g. ['changes', 'logs']).\n\n"
             f"Assess missing information for this incident:\n"
             f"{json.dumps(payload, indent=2)}"
         )
@@ -561,9 +628,16 @@ class LLMReasoningProvider:
             "budget": budget.model_dump(mode="json"),
             "context_snapshot_id": context.snapshot_id,
         }
+        allowed_params = {
+            (s.source_type.value if hasattr(s.source_type, "value") else str(s.source_type)): s.supported_query_fields
+            for s in source_capabilities.sources
+            if s.available
+        }
         return (
             f"Prompt Version: {PROMPT_VERSION_PLAN}\n"
-            f"Plan queries for missing information:\n"
+            f"Allowed query parameter fields for available sources:\n"
+            f"{json.dumps(allowed_params, indent=2)}\n\n"
+            f"Plan queries for missing information (CRITICAL: only use allowed fields above for each source):\n"
             f"{json.dumps(payload, indent=2)}"
         )
 

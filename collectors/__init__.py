@@ -28,6 +28,8 @@ from collectors.interfaces import (
     SourceQuery,
     SourceResult,
 )
+from collectors.changes.git_adapter import LocalGitChangeAdapter
+from collectors.logs.file_adapter import FileLogAdapter
 from collectors.logs.fixture_adapter import FixtureLogAdapter
 from collectors.metrics.fixture_adapter import FixtureMetricAdapter
 from collectors.pipelines.fixture_adapter import FixturePipelineAdapter
@@ -49,6 +51,8 @@ __all__ = [
     "FixtureDeploymentAdapter",
     "FixturePipelineAdapter",
     "FixtureConfigurationAdapter",
+    "LocalGitChangeAdapter",
+    "FileLogAdapter",
     "ReplayAdapter",
     "create_scenario_adapters",
     "list_available_scenarios",

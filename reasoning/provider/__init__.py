@@ -1,5 +1,8 @@
-"""ReasoningProvider interface and adapter implementations."""
-
+from reasoning.provider.clients import (
+    GeminiClient,
+    OpenAICompatibleClient,
+    create_llm_client,
+)
 from reasoning.provider.fake_provider import FakeReasoningProvider
 from reasoning.provider.interface import ReasoningProvider
 from reasoning.provider.llm_provider import (
@@ -17,13 +20,16 @@ from reasoning.provider.recorded_provider import (
 
 __all__ = [
     "FakeReasoningProvider",
+    "GeminiClient",
     "LLMCallRecord",
     "LLMClient",
     "LLMProviderError",
     "LLMReasoningProvider",
     "LLMResponse",
     "ModelPricing",
+    "OpenAICompatibleClient",
     "ReasoningProvider",
     "RecordedReasoningProvider",
     "UnrecordedRequestError",
+    "create_llm_client",
 ]
