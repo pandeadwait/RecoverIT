@@ -1,0 +1,228 @@
+{
+  "created_at": "2026-09-12T10:32:00Z",
+  "evidence": [
+    {
+      "event_time": "2026-09-12T10:10:00Z",
+      "evidence_id": "ev_fe6d22bd57035f44ba9b4037",
+      "evidence_type": "source_change",
+      "quality": {
+        "freshness_seconds": 1258,
+        "redactions_applied": false,
+        "reliability": "unknown",
+        "truncated_source": false
+      },
+      "source_type": "changes",
+      "summary": "Update database endpoint"
+    },
+    {
+      "event_time": "2026-09-12T10:15:00Z",
+      "evidence_id": "ev_421f034ba94831b896150586",
+      "evidence_type": "pipeline_event",
+      "quality": {
+        "freshness_seconds": 959,
+        "redactions_applied": false,
+        "reliability": "unknown",
+        "truncated_source": false
+      },
+      "source_type": "pipelines",
+      "summary": "Pipeline run pipeline-1 passed"
+    },
+    {
+      "event_time": "2026-09-12T10:20:00Z",
+      "evidence_id": "ev_f577542b4de2c65e734690b5",
+      "evidence_type": "deployment_event",
+      "quality": {
+        "freshness_seconds": 657,
+        "redactions_applied": false,
+        "reliability": "unknown",
+        "truncated_source": false
+      },
+      "source_type": "deployments",
+      "summary": "Deployment deploy-1 succeeded"
+    },
+    {
+      "event_time": "2026-09-12T10:27:15Z",
+      "evidence_id": "ev_3bbb695ec58952366f346f99",
+      "evidence_type": "error_event",
+      "quality": {
+        "freshness_seconds": 224,
+        "redactions_applied": false,
+        "reliability": "unknown",
+        "truncated_source": false
+      },
+      "source_type": "logs",
+      "summary": "Database connection timeout"
+    },
+    {
+      "event_time": "2026-09-12T10:28:00Z",
+      "evidence_id": "ev_cde182b73e7ff70133eafeaf",
+      "evidence_type": "metric_observation",
+      "quality": {
+        "freshness_seconds": 175,
+        "redactions_applied": false,
+        "reliability": "unknown",
+        "truncated_source": false
+      },
+      "source_type": "metrics",
+      "summary": "Metric http_500_rate = 0.42 ratio"
+    },
+    {
+      "evidence_id": "ev_7686e05d9481166c2b01d194",
+      "evidence_type": "configuration_change",
+      "quality": {
+        "freshness_seconds": 779,
+        "redactions_applied": false,
+        "reliability": "unknown",
+        "truncated_source": true
+      },
+      "source_type": "configuration",
+      "summary": "Database host configuration changed"
+    }
+  ],
+  "incident": {
+    "detected_at": "2026-09-12T10:30:00Z",
+    "environment": "simulation",
+    "service": "payment-api",
+    "severity": "critical",
+    "summary": "HTTP 500 rate exceeded threshold"
+  },
+  "incident_id": "inc_001",
+  "relationships": [
+    {
+      "created_by": "deterministic",
+      "delta_ms": 600000,
+      "from_event_id": "tle_dced2fe0f0634820e8e88a17",
+      "incident_id": "inc_001",
+      "relationship_id": "rel_16419579a887b3c983561e5e",
+      "relationship_type": "DEPLOYED_FROM",
+      "schema_version": "1.0",
+      "to_event_id": "tle_365f57648bb8735ddb4c50c0"
+    },
+    {
+      "created_by": "deterministic",
+      "delta_ms": 435000,
+      "from_event_id": "tle_dced2fe0f0634820e8e88a17",
+      "incident_id": "inc_001",
+      "relationship_id": "rel_2c4aa72f9b6bb77e551190f6",
+      "relationship_type": "PRECEDES",
+      "schema_version": "1.0",
+      "to_event_id": "tle_f1e9e9169966404de41d68a7"
+    },
+    {
+      "created_by": "deterministic",
+      "delta_ms": 300000,
+      "from_event_id": "tle_5f33493ad63edb653807cb9b",
+      "incident_id": "inc_001",
+      "relationship_id": "rel_ba040146e48dba46435d3b60",
+      "relationship_type": "PRECEDES",
+      "schema_version": "1.0",
+      "to_event_id": "tle_dced2fe0f0634820e8e88a17"
+    },
+    {
+      "created_by": "deterministic",
+      "delta_ms": 45000,
+      "from_event_id": "tle_f1e9e9169966404de41d68a7",
+      "incident_id": "inc_001",
+      "relationship_id": "rel_e8efb7719ab0f556952fec15",
+      "relationship_type": "PRECEDES",
+      "schema_version": "1.0",
+      "to_event_id": "tle_71f60f9a90994e50ee0eaf14"
+    },
+    {
+      "created_by": "deterministic",
+      "delta_ms": 300000,
+      "from_event_id": "tle_365f57648bb8735ddb4c50c0",
+      "incident_id": "inc_001",
+      "relationship_id": "rel_f57b4f19df529b755f229ad6",
+      "relationship_type": "PRECEDES",
+      "schema_version": "1.0",
+      "to_event_id": "tle_5f33493ad63edb653807cb9b"
+    }
+  ],
+  "revision": 1,
+  "schema_version": "1.0",
+  "snapshot_id": "ctx_21fccfb5b0bd972646612066",
+  "source_coverage": {
+    "changes": "available",
+    "configuration": "available",
+    "deployments": "available",
+    "logs": "available",
+    "metrics": "available",
+    "pipelines": "available"
+  },
+  "timeline": [
+    {
+      "category": "change",
+      "event_time": "2026-09-12T10:10:00Z",
+      "evidence_ids": [
+        "ev_fe6d22bd57035f44ba9b4037"
+      ],
+      "incident_id": "inc_001",
+      "schema_version": "1.0",
+      "service": "payment-api",
+      "timeline_event_id": "tle_365f57648bb8735ddb4c50c0",
+      "title": "Update database endpoint"
+    },
+    {
+      "category": "change",
+      "event_time": "2026-09-12T10:15:00Z",
+      "evidence_ids": [
+        "ev_421f034ba94831b896150586"
+      ],
+      "incident_id": "inc_001",
+      "schema_version": "1.0",
+      "service": "payment-api",
+      "timeline_event_id": "tle_5f33493ad63edb653807cb9b",
+      "title": "Pipeline run pipeline-1 passed"
+    },
+    {
+      "category": "deployment",
+      "event_time": "2026-09-12T10:20:00Z",
+      "evidence_ids": [
+        "ev_f577542b4de2c65e734690b5"
+      ],
+      "incident_id": "inc_001",
+      "schema_version": "1.0",
+      "service": "payment-api",
+      "time_uncertainty_ms": 1000,
+      "timeline_event_id": "tle_dced2fe0f0634820e8e88a17",
+      "title": "Deployment deploy-1 succeeded"
+    },
+    {
+      "category": "symptom",
+      "event_time": "2026-09-12T10:27:15Z",
+      "evidence_ids": [
+        "ev_3bbb695ec58952366f346f99"
+      ],
+      "incident_id": "inc_001",
+      "schema_version": "1.0",
+      "service": "payment-api",
+      "timeline_event_id": "tle_f1e9e9169966404de41d68a7",
+      "title": "Database connection timeout"
+    },
+    {
+      "category": "symptom",
+      "event_time": "2026-09-12T10:28:00Z",
+      "evidence_ids": [
+        "ev_cde182b73e7ff70133eafeaf"
+      ],
+      "incident_id": "inc_001",
+      "schema_version": "1.0",
+      "service": "payment-api",
+      "timeline_event_id": "tle_71f60f9a90994e50ee0eaf14",
+      "title": "Metric http_500_rate = 0.42 ratio"
+    },
+    {
+      "category": "change",
+      "evidence_ids": [
+        "ev_7686e05d9481166c2b01d194"
+      ],
+      "incident_id": "inc_001",
+      "schema_version": "1.0",
+      "service": "payment-api",
+      "timeline_event_id": "tle_9c191c7f0fa1b810bf843355",
+      "title": "Database host configuration changed"
+    }
+  ],
+  "warnings": []
+}
