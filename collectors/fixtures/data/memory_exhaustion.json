@@ -1,0 +1,121 @@
+{
+  "scenario_id": "memory_exhaustion",
+  "title": "Memory exhaustion and container restarts",
+  "service": "order-api",
+  "detected_at": "2026-09-12T14:45:00Z",
+  "sources": {
+    "logs": [
+      {
+        "source_record_id": "log-oom-001",
+        "event_time": "2026-09-12T14:42:10Z",
+        "observed_at": "2026-09-12T14:42:11Z",
+        "content_type": "container_log",
+        "payload": {
+          "level": "critical",
+          "service": "order-api",
+          "message": "Container order-api-worker-7f9b was terminated with exit code 137 (OOMKilled). Memory limit 512Mi exceeded.",
+          "error_signature": "container_oom_killed"
+        }
+      },
+      {
+        "source_record_id": "log-oom-002",
+        "event_time": "2026-09-12T14:43:00Z",
+        "observed_at": "2026-09-12T14:43:02Z",
+        "content_type": "system_log",
+        "payload": {
+          "level": "error",
+          "service": "order-api",
+          "message": "Pod order-api-worker restarted 3 times in last 10 minutes",
+          "error_signature": "pod_restart_loop"
+        }
+      }
+    ],
+    "metrics": [
+      {
+        "source_record_id": "metric-mem-usage",
+        "event_time": "2026-09-12T14:40:00Z",
+        "observed_at": "2026-09-12T14:40:05Z",
+        "content_type": "time_series",
+        "payload": {
+          "metric_name": "container_memory_usage_bytes",
+          "service": "order-api",
+          "values": [256000000, 380000000, 480000000, 536870912, 100000000],
+          "unit": "bytes",
+          "baseline": 256000000
+        }
+      },
+      {
+        "source_record_id": "metric-restarts",
+        "event_time": "2026-09-12T14:42:00Z",
+        "observed_at": "2026-09-12T14:42:05Z",
+        "content_type": "time_series",
+        "payload": {
+          "metric_name": "container_restart_count",
+          "service": "order-api",
+          "values": [0, 0, 1, 2, 4],
+          "unit": "restarts",
+          "baseline": 0
+        }
+      }
+    ],
+    "changes": [
+      {
+        "source_record_id": "commit-mem-01",
+        "event_time": "2026-09-12T12:00:00Z",
+        "observed_at": "2026-09-12T12:00:05Z",
+        "content_type": "git_commit",
+        "payload": {
+          "commit_sha": "mem9876543210aa",
+          "author": "dev@company.local",
+          "message": "Add unbounded in-memory cache for order history processing",
+          "files_changed": ["src/orders/cache.py"],
+          "diff_excerpt": "+ self._cache[order_id] = heavy_object"
+        }
+      }
+    ],
+    "deployments": [
+      {
+        "source_record_id": "dep-v110",
+        "event_time": "2026-09-12T12:30:00Z",
+        "observed_at": "2026-09-12T12:30:05Z",
+        "content_type": "deployment_event",
+        "payload": {
+          "deployment_id": "dep_v1.1.0",
+          "service": "order-api",
+          "version": "v1.1.0",
+          "commit_sha": "mem9876543210aa",
+          "previous_healthy_version": "v1.0.9",
+          "status": "succeeded"
+        }
+      }
+    ],
+    "pipelines": [
+      {
+        "source_record_id": "pipe-run-92",
+        "event_time": "2026-09-12T12:20:00Z",
+        "observed_at": "2026-09-12T12:20:02Z",
+        "content_type": "pipeline_run",
+        "payload": {
+          "pipeline": "order-api-ci",
+          "run_id": "run-92",
+          "status": "passed",
+          "stages": ["lint", "unit-test", "build", "deploy"],
+          "tests_passed": 98,
+          "tests_failed": 0
+        }
+      }
+    ],
+    "configuration": [
+      {
+        "source_record_id": "cfg-mem-none",
+        "event_time": "2026-09-12T12:30:00Z",
+        "observed_at": "2026-09-12T12:30:02Z",
+        "content_type": "config_snapshot",
+        "payload": {
+          "service": "order-api",
+          "message": "No configuration modifications recorded."
+        }
+      }
+    ]
+  }
+}

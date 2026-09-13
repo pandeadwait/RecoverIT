@@ -1,0 +1,124 @@
+{
+  "scenario_id": "bad_db_config",
+  "title": "Bad database configuration introduced by deployment",
+  "service": "payment-api",
+  "detected_at": "2026-09-12T10:30:00Z",
+  "sources": {
+    "logs": [
+      {
+        "source_record_id": "log-db-001",
+        "event_time": "2026-09-12T10:27:15Z",
+        "observed_at": "2026-09-12T10:27:16Z",
+        "content_type": "application_log",
+        "payload": {
+          "level": "error",
+          "service": "payment-api",
+          "message": "Database connection timeout after 5000ms connecting to db-primary-misconfig:5432",
+          "error_signature": "db_connection_timeout"
+        }
+      },
+      {
+        "source_record_id": "log-db-002",
+        "event_time": "2026-09-12T10:28:00Z",
+        "observed_at": "2026-09-12T10:28:01Z",
+        "content_type": "application_log",
+        "payload": {
+          "level": "critical",
+          "service": "payment-api",
+          "message": "Connection pool exhausted: 0 of 20 available. Target: db-primary-misconfig:5432",
+          "error_signature": "connection_pool_exhausted"
+        }
+      }
+    ],
+    "metrics": [
+      {
+        "source_record_id": "metric-http-500",
+        "event_time": "2026-09-12T10:27:00Z",
+        "observed_at": "2026-09-12T10:27:05Z",
+        "content_type": "time_series",
+        "payload": {
+          "metric_name": "http_500_rate",
+          "service": "payment-api",
+          "values": [0.01, 0.02, 0.15, 0.28, 0.35],
+          "unit": "ratio",
+          "baseline": 0.01
+        }
+      },
+      {
+        "source_record_id": "metric-db-pool",
+        "event_time": "2026-09-12T10:27:30Z",
+        "observed_at": "2026-09-12T10:27:35Z",
+        "content_type": "time_series",
+        "payload": {
+          "metric_name": "db_connection_pool_active",
+          "service": "payment-api",
+          "values": [20, 15, 5, 0, 0],
+          "unit": "connections",
+          "baseline": 20
+        }
+      }
+    ],
+    "changes": [
+      {
+        "source_record_id": "commit-c101",
+        "event_time": "2026-09-12T10:15:00Z",
+        "observed_at": "2026-09-12T10:15:02Z",
+        "content_type": "git_commit",
+        "payload": {
+          "commit_sha": "abc12347890def",
+          "author": "dev@company.local",
+          "message": "Update database connection configuration for payment service",
+          "files_changed": ["config/database.yaml", "src/db/pool.py"],
+          "diff_excerpt": "- host: db-cluster.internal\n+ host: db-primary-misconfig"
+        }
+      }
+    ],
+    "deployments": [
+      {
+        "source_record_id": "dep-v241",
+        "event_time": "2026-09-12T10:25:00Z",
+        "observed_at": "2026-09-12T10:25:05Z",
+        "content_type": "deployment_event",
+        "payload": {
+          "deployment_id": "dep_v2.4.1",
+          "service": "payment-api",
+          "version": "v2.4.1",
+          "commit_sha": "abc12347890def",
+          "previous_healthy_version": "v2.4.0",
+          "status": "succeeded"
+        }
+      }
+    ],
+    "pipelines": [
+      {
+        "source_record_id": "pipe-run-88",
+        "event_time": "2026-09-12T10:24:00Z",
+        "observed_at": "2026-09-12T10:24:02Z",
+        "content_type": "pipeline_run",
+        "payload": {
+          "pipeline": "payment-api-ci",
+          "run_id": "run-88",
+          "status": "passed",
+          "stages": ["lint", "test", "build", "deploy"],
+          "tests_passed": 142,
+          "tests_failed": 0
+        }
+      }
+    ],
+    "configuration": [
+      {
+        "source_record_id": "cfg-chg-01",
+        "event_time": "2026-09-12T10:25:10Z",
+        "observed_at": "2026-09-12T10:25:12Z",
+        "content_type": "config_change",
+        "payload": {
+          "service": "payment-api",
+          "key": "database.host",
+          "old_value": "db-cluster.internal",
+          "new_value": "db-primary-misconfig",
+          "changed_by": "deployment-v2.4.1"
+        }
+      }
+    ]
+  }
+}
