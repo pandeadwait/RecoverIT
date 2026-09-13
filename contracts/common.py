@@ -35,7 +35,6 @@ class SourceType(StrEnum):
     CONFIGURATION = "configuration"
     HEALTH = "health"
     OPERATOR = "operator"
-    UNKNOWN = "unknown"
 
 
 class Severity(StrEnum):
@@ -56,7 +55,6 @@ class Reliability(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
-    UNKNOWN = "unknown"
 
 
 class SourceCoverageState(StrEnum):
@@ -64,7 +62,6 @@ class SourceCoverageState(StrEnum):
     EMPTY = "empty"
     NOT_QUERIED = "not_queried"
     UNAVAILABLE = "unavailable"
-    UNKNOWN = "unknown"
 
 
 # Person 3's schema name for the same wire-level concept.

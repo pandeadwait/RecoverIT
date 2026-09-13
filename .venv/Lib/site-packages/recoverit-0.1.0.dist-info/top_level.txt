@@ -1,3 +1,0 @@
-collectors
-contracts
-ingestion
