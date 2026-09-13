@@ -1,0 +1,147 @@
+{
+  "assess_missing_information": {
+    "schema_version": "1.0",
+    "incident_id": "inc_oom_01",
+    "assessment_id": "mia_oom_01",
+    "known_facts": [
+      {
+        "schema_version": "1.0",
+        "statement": "Container auth-service exited with exit code 137 OOMKilled.",
+        "supporting_evidence_ids": ["ev_oom_log_01"]
+      },
+      {
+        "schema_version": "1.0",
+        "statement": "Memory working set linearly increased to 2048MB limit.",
+        "supporting_evidence_ids": ["ev_oom_metric_01"]
+      }
+    ],
+    "missing_information": [
+      {
+        "schema_version": "1.0",
+        "information_id": "need_heap_dump",
+        "question": "Which objects dominated the JVM heap before OOM?",
+        "reason": "Identifies the specific leaky data structure in auth-service.",
+        "priority": "medium",
+        "candidate_sources": ["logs", "metrics"],
+        "resolved": false
+      }
+    ],
+    "unavailable_information": [],
+    "recommended_stop": false
+  },
+  "plan_queries": {
+    "schema_version": "1.0",
+    "incident_id": "inc_oom_01",
+    "plan_id": "plan_oom_01",
+    "round": 1,
+    "queries": [
+      {
+        "schema_version": "1.0",
+        "query_id": "qry_oom_metric_01",
+        "source_type": "metrics",
+        "question": "Query heap garbage collection metrics for auth-service",
+        "parameters": {
+          "metric": "jvm_gc_pause_seconds",
+          "service": "auth-service",
+          "limit": 100
+        },
+        "related_information_ids": ["need_heap_dump"],
+        "discriminates_hypothesis_ids": ["hyp_oom_01"],
+        "expected_information_value": "high"
+      }
+    ],
+    "stop_reason": null
+  },
+  "generate_hypotheses": {
+    "schema_version": "1.0",
+    "incident_id": "inc_oom_01",
+    "hypotheses": [
+      {
+        "schema_version": "1.0",
+        "hypothesis_id": "hyp_oom_01",
+        "incident_id": "inc_oom_01",
+        "revision": 1,
+        "statement": "JWKS token cache memory leak in auth-service causing container OOMKilled crash.",
+        "root_cause_category": "resource_exhaustion",
+        "affected_component": "auth-service",
+        "supporting_evidence": [
+          {
+            "schema_version": "1.0",
+            "evidence_id": "ev_oom_log_01",
+            "reason": "Container exit code 137 OOMKilled"
+          },
+          {
+            "schema_version": "1.0",
+            "evidence_id": "ev_oom_metric_01",
+            "reason": "Linear memory working set growth to 2GB"
+          }
+        ],
+        "contradicting_evidence": [],
+        "missing_information_ids": [],
+        "testable_prediction": "Container exit code is 137 and GC pause times increase exponentially.",
+        "status": "active"
+      },
+      {
+        "schema_version": "1.0",
+        "hypothesis_id": "hyp_oom_02",
+        "incident_id": "inc_oom_01",
+        "revision": 1,
+        "statement": "Sudden DDoS traffic spike overwhelmed auth pod memory.",
+        "root_cause_category": "infrastructure_failure",
+        "affected_component": "auth-service",
+        "supporting_evidence": [],
+        "contradicting_evidence": [],
+        "missing_information_ids": [],
+        "testable_prediction": "Ingress HTTP request rate increased 10x before crash.",
+        "status": "active"
+      }
+    ],
+    "generated_at": "2026-09-12T18:05:00Z"
+  },
+  "revise_hypotheses": {
+    "schema_version": "1.0",
+    "incident_id": "inc_oom_01",
+    "hypotheses": [
+      {
+        "schema_version": "1.0",
+        "hypothesis_id": "hyp_oom_01",
+        "incident_id": "inc_oom_01",
+        "revision": 2,
+        "statement": "JWKS token cache memory leak in auth-service causing container OOMKilled crash.",
+        "root_cause_category": "resource_exhaustion",
+        "affected_component": "auth-service",
+        "supporting_evidence": [
+          {
+            "schema_version": "1.0",
+            "evidence_id": "ev_oom_log_01",
+            "reason": "Container exit code 137 OOMKilled"
+          },
+          {
+            "schema_version": "1.0",
+            "evidence_id": "ev_oom_metric_01",
+            "reason": "Linear memory working set growth to 2GB"
+          }
+        ],
+        "contradicting_evidence": [],
+        "missing_information_ids": [],
+        "testable_prediction": "Container exit code is 137 and GC pause times increase exponentially.",
+        "status": "active"
+      },
+      {
+        "schema_version": "1.0",
+        "hypothesis_id": "hyp_oom_02",
+        "incident_id": "inc_oom_01",
+        "revision": 2,
+        "statement": "Sudden DDoS traffic spike overwhelmed auth pod memory.",
+        "root_cause_category": "infrastructure_failure",
+        "affected_component": "auth-service",
+        "supporting_evidence": [],
+        "contradicting_evidence": [],
+        "missing_information_ids": [],
+        "testable_prediction": "Ingress HTTP request rate increased 10x before crash.",
+        "status": "weakened"
+      }
+    ],
+    "generated_at": "2026-09-12T18:06:00Z"
+  }
+}

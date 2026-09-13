@@ -1,0 +1,16 @@
+{
+  "weights": {
+    "independent_source_support": 25.0,
+    "symptom_coverage": 20.0,
+    "temporal_consistency": 15.0,
+    "change_consistency": 15.0,
+    "specificity": 10.0,
+    "prediction_support": 15.0,
+    "contradiction_penalty": 30.0,
+    "missing_evidence_penalty": 20.0
+  },
+  "thresholds": {
+    "high": 70.0,
+    "medium": 40.0
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "incident_id": "inc_db_outage_01",
+  "external_alert_id": "alt_db_202",
+  "service": "order-service",
+  "environment": "production",
+  "severity": "critical",
+  "detected_at": "2026-09-12T14:00:00Z",
+  "received_at": "2026-09-12T14:01:00Z",
+  "summary": "Primary PostgreSQL database node hardware failure and failover crash",
+  "labels": {
+    "tier": "1",
+    "team": "database"
+  }
+}

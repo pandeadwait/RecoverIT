@@ -9,6 +9,8 @@ import json
 from types import MappingProxyType
 from typing import Any, TypeVar
 
+from pydantic import BaseModel, ConfigDict, Field
+
 SCHEMA_VERSION = "1.0"
 JSONValue = str | int | float | bool | None | tuple["JSONValue", ...] | Mapping[str, "JSONValue"]
 T = TypeVar("T")
@@ -31,7 +33,23 @@ class SourceType(StrEnum):
     DEPLOYMENTS = "deployments"
     PIPELINES = "pipelines"
     CONFIGURATION = "configuration"
+    HEALTH = "health"
+    OPERATOR = "operator"
     UNKNOWN = "unknown"
+
+
+class Severity(StrEnum):
+    INFO = "info"
+    WARNING = "warning"
+    CRITICAL = "critical"
+
+
+class SourceStatus(StrEnum):
+    OK = "ok"
+    UNAVAILABLE = "unavailable"
+    TIMEOUT = "timeout"
+    ERROR = "error"
+    PARTIAL = "partial"
 
 
 class Reliability(StrEnum):
@@ -47,6 +65,124 @@ class SourceCoverageState(StrEnum):
     NOT_QUERIED = "not_queried"
     UNAVAILABLE = "unavailable"
     UNKNOWN = "unknown"
+
+
+# Person 3's schema name for the same wire-level concept.
+SourceCoverageStatus = SourceCoverageState
+
+
+class EvidenceType(StrEnum):
+    ERROR_EVENT = "error_event"
+    WARNING_EVENT = "warning_event"
+    INFO_EVENT = "info_event"
+    METRIC_ANOMALY = "metric_anomaly"
+    METRIC_NORMAL = "metric_normal"
+    CODE_CHANGE = "code_change"
+    CONFIGURATION_CHANGE = "configuration_change"
+    DEPLOYMENT_EVENT = "deployment_event"
+    PIPELINE_RESULT = "pipeline_result"
+    HEALTH_CHECK = "health_check"
+    OPERATOR_NOTE = "operator_note"
+
+
+class TimelineCategory(StrEnum):
+    CHANGE = "change"
+    DEPLOYMENT = "deployment"
+    SYMPTOM = "symptom"
+    ALERT = "alert"
+    ACTION = "action"
+    VERIFICATION = "verification"
+
+
+class RelationshipType(StrEnum):
+    PRECEDES = "PRECEDES"
+    COINCIDES_WITH = "COINCIDES_WITH"
+    SUPPORTS = "SUPPORTS"
+    CONTRADICTS = "CONTRADICTS"
+    DEPLOYED_FROM = "DEPLOYED_FROM"
+    AFFECTS = "AFFECTS"
+    OBSERVED_ON = "OBSERVED_ON"
+    PREDICTS = "PREDICTS"
+
+
+class RelationshipCreator(StrEnum):
+    DETERMINISTIC = "deterministic"
+    MODEL = "model"
+    OPERATOR = "operator"
+
+
+class HypothesisStatus(StrEnum):
+    ACTIVE = "active"
+    WEAKENED = "weakened"
+    REJECTED = "rejected"
+    SELECTED = "selected"
+
+
+class ConfidenceLabel(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class RootCauseCategory(StrEnum):
+    CONFIGURATION_REGRESSION = "configuration_regression"
+    RESOURCE_EXHAUSTION = "resource_exhaustion"
+    DEPENDENCY_INCOMPATIBILITY = "dependency_incompatibility"
+    DATABASE_OUTAGE = "database_outage"
+    DEPLOYMENT_FAILURE = "deployment_failure"
+    CODE_DEFECT = "code_defect"
+    INFRASTRUCTURE_FAILURE = "infrastructure_failure"
+    EXTERNAL_DEPENDENCY_FAILURE = "external_dependency_failure"
+    UNKNOWN = "unknown"
+
+
+class InformationPriority(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class InvestigationState(StrEnum):
+    RECEIVED = "RECEIVED"
+    ASSESSING_GAPS = "ASSESSING_GAPS"
+    COLLECTING_EVIDENCE = "COLLECTING_EVIDENCE"
+    BUILDING_TIMELINE = "BUILDING_TIMELINE"
+    GENERATING_HYPOTHESES = "GENERATING_HYPOTHESES"
+    RANKING = "RANKING"
+    COMPLETED = "COMPLETED"
+    INCONCLUSIVE = "INCONCLUSIVE"
+    CANCELLED = "CANCELLED"
+
+
+class InvestigationStatus(StrEnum):
+    COMPLETED = "completed"
+    INCONCLUSIVE = "inconclusive"
+
+
+class StopReason(StrEnum):
+    SUFFICIENT_EVIDENCE = "sufficient_evidence"
+    BUDGET_EXHAUSTED = "budget_exhausted"
+    INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+    SOURCES_UNAVAILABLE = "sources_unavailable"
+    REPEATED_INVALID_OUTPUT = "repeated_invalid_output"
+
+
+class InformationValueLevel(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class ContractModel(BaseModel):
+    """Frozen Pydantic base used by Person 3's serialized schemas."""
+
+    model_config = ConfigDict(
+        frozen=True,
+        use_enum_values=True,
+        json_schema_extra={"additionalProperties": False},
+    )
+
+    schema_version: str = Field(default=SCHEMA_VERSION)
 
 
 def require_mapping(value: object, path: str) -> Mapping[str, Any]:

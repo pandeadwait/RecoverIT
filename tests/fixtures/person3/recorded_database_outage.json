@@ -1,0 +1,156 @@
+{
+  "assess_missing_information": {
+    "schema_version": "1.0",
+    "incident_id": "inc_db_outage_01",
+    "assessment_id": "mia_db_01",
+    "known_facts": [
+      {
+        "schema_version": "1.0",
+        "statement": "Primary database node pg-db-01 failed TCP health check.",
+        "supporting_evidence_ids": ["ev_db_health_01"]
+      },
+      {
+        "schema_version": "1.0",
+        "statement": "Connection refused errors reported by order-service.",
+        "supporting_evidence_ids": ["ev_db_log_01"]
+      }
+    ],
+    "missing_information": [
+      {
+        "schema_version": "1.0",
+        "information_id": "need_failover_status",
+        "question": "Did automated failover to pg-db-02 trigger?",
+        "reason": "Determines why secondary database node did not accept connections.",
+        "priority": "high",
+        "candidate_sources": ["logs", "health"],
+        "resolved": false
+      }
+    ],
+    "unavailable_information": [],
+    "recommended_stop": false
+  },
+  "plan_queries": {
+    "schema_version": "1.0",
+    "incident_id": "inc_db_outage_01",
+    "plan_id": "plan_db_01",
+    "round": 1,
+    "queries": [
+      {
+        "schema_version": "1.0",
+        "query_id": "qry_health_01",
+        "source_type": "health",
+        "question": "Check health of standby PostgreSQL replica pg-db-02",
+        "parameters": {
+          "service": "order-service",
+          "target": "pg-db-02"
+        },
+        "related_information_ids": ["need_failover_status"],
+        "discriminates_hypothesis_ids": ["hyp_db_01"],
+        "expected_information_value": "high"
+      }
+    ],
+    "stop_reason": null
+  },
+  "generate_hypotheses": {
+    "schema_version": "1.0",
+    "incident_id": "inc_db_outage_01",
+    "hypotheses": [
+      {
+        "schema_version": "1.0",
+        "hypothesis_id": "hyp_db_01",
+        "incident_id": "inc_db_outage_01",
+        "revision": 1,
+        "statement": "Primary PostgreSQL database node pg-db-01 suffered hardware crash and failover failed.",
+        "root_cause_category": "database_outage",
+        "affected_component": "order-service",
+        "supporting_evidence": [
+          {
+            "schema_version": "1.0",
+            "evidence_id": "ev_db_health_01",
+            "reason": "Health check failed on primary node"
+          },
+          {
+            "schema_version": "1.0",
+            "evidence_id": "ev_db_log_01",
+            "reason": "Connection refused in application logs"
+          },
+          {
+            "schema_version": "1.0",
+            "evidence_id": "ev_db_metric_01",
+            "reason": "Active DB connections dropped to 0"
+          }
+        ],
+        "contradicting_evidence": [],
+        "missing_information_ids": [],
+        "testable_prediction": "Replica pg-db-02 replication lag or promotion status log contains error.",
+        "status": "active"
+      },
+      {
+        "schema_version": "1.0",
+        "hypothesis_id": "hyp_db_02",
+        "incident_id": "inc_db_outage_01",
+        "revision": 1,
+        "statement": "Bad deployment changed DB connection password.",
+        "root_cause_category": "configuration_regression",
+        "affected_component": "order-service",
+        "supporting_evidence": [],
+        "contradicting_evidence": [],
+        "missing_information_ids": [],
+        "testable_prediction": "Recent deployment logged password auth failure.",
+        "status": "active"
+      }
+    ],
+    "generated_at": "2026-09-12T14:05:00Z"
+  },
+  "revise_hypotheses": {
+    "schema_version": "1.0",
+    "incident_id": "inc_db_outage_01",
+    "hypotheses": [
+      {
+        "schema_version": "1.0",
+        "hypothesis_id": "hyp_db_01",
+        "incident_id": "inc_db_outage_01",
+        "revision": 2,
+        "statement": "Primary PostgreSQL database node pg-db-01 suffered hardware crash and failover failed.",
+        "root_cause_category": "database_outage",
+        "affected_component": "order-service",
+        "supporting_evidence": [
+          {
+            "schema_version": "1.0",
+            "evidence_id": "ev_db_health_01",
+            "reason": "Health check failed on primary node"
+          },
+          {
+            "schema_version": "1.0",
+            "evidence_id": "ev_db_log_01",
+            "reason": "Connection refused in application logs"
+          },
+          {
+            "schema_version": "1.0",
+            "evidence_id": "ev_db_metric_01",
+            "reason": "Active DB connections dropped to 0"
+          }
+        ],
+        "contradicting_evidence": [],
+        "missing_information_ids": [],
+        "testable_prediction": "Replica pg-db-02 replication lag or promotion status log contains error.",
+        "status": "active"
+      },
+      {
+        "schema_version": "1.0",
+        "hypothesis_id": "hyp_db_02",
+        "incident_id": "inc_db_outage_01",
+        "revision": 2,
+        "statement": "Bad deployment changed DB connection password.",
+        "root_cause_category": "configuration_regression",
+        "affected_component": "order-service",
+        "supporting_evidence": [],
+        "contradicting_evidence": [],
+        "missing_information_ids": [],
+        "testable_prediction": "Recent deployment logged password auth failure.",
+        "status": "weakened"
+      }
+    ],
+    "generated_at": "2026-09-12T14:06:00Z"
+  }
+}

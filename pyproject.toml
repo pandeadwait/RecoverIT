@@ -13,12 +13,14 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+asyncio_mode = "auto"
 
 [tool.setuptools.packages.find]
 include = ["contracts*", "ingestion*", "collectors*", "evidence*", "timeline*", "investigation*", "reasoning*"]

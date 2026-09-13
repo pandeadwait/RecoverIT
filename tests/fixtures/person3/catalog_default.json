@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "incident_id": "inc_scenarios",
+  "generated_at": "2026-09-12T10:00:00Z",
+  "sources": [
+    {
+      "source_type": "logs",
+      "available": true,
+      "supported_query_fields": ["service", "severity", "limit"],
+      "maximum_window_seconds": 3600,
+      "maximum_items": 500
+    },
+    {
+      "source_type": "deployments",
+      "available": true,
+      "supported_query_fields": ["service", "limit"],
+      "maximum_window_seconds": 86400,
+      "maximum_items": 50
+    },
+    {
+      "source_type": "metrics",
+      "available": true,
+      "supported_query_fields": ["metric", "service", "limit"],
+      "maximum_window_seconds": 3600,
+      "maximum_items": 200
+    },
+    {
+      "source_type": "configuration",
+      "available": true,
+      "supported_query_fields": ["service", "key"],
+      "maximum_window_seconds": 86400,
+      "maximum_items": 50
+    },
+    {
+      "source_type": "health",
+      "available": true,
+      "supported_query_fields": ["service", "target"],
+      "maximum_window_seconds": 3600,
+      "maximum_items": 100
+    }
+  ]
+}
