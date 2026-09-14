@@ -16,7 +16,12 @@ from datetime import datetime, timezone
 from typing import Any
 
 from contracts.collection.schemas import SourceCapability, SourceCapabilityCatalog
-from contracts.common import InformationValueLevel, SourceType, StopReason
+from contracts.common import (
+    InformationGapCategory,
+    InformationValueLevel,
+    SourceType,
+    StopReason,
+)
 from contracts.errors.schemas import (
     BUDGET_EXHAUSTED,
     DUPLICATE_QUERY,
@@ -160,9 +165,33 @@ class EvidenceQueryPlanner:
                 self._last_warnings.append(warning)
                 continue
 
+            # Ensure related_information_ids are populated if empty
+            if missing_information and not q.related_information_ids:
+                matching_gap_ids = [
+                    item.information_id
+                    for item in missing_information.missing_information
+                    if q.source_type in item.candidate_sources
+                ]
+                if matching_gap_ids:
+                    q = q.model_copy(update={"related_information_ids": matching_gap_ids})
+
             param_canonical = self._canonical_params(q.parameters)
             seen_queries.append((q.source_type, param_canonical))
             valid_queries.append(q)
+
+        # Prioritize direct causal evidence queries when change-related gaps exist
+        has_direct_causal_gap = any(
+            getattr(item, "category", None) == InformationGapCategory.DIRECT_CAUSAL_EVIDENCE
+            for item in (missing_information.missing_information if missing_information else [])
+        )
+        if has_direct_causal_gap:
+            causal_types = {
+                SourceType.CHANGES,
+                SourceType.CONFIGURATION,
+                SourceType.DEPLOYMENTS,
+                SourceType.PIPELINES,
+            }
+            valid_queries.sort(key=lambda q: 0 if q.source_type in causal_types else 1)
 
         # Enforce budget limits
         max_allowed_queries: int
@@ -366,3 +395,26 @@ class EvidenceQueryPlanner:
             return json.dumps(parameters, sort_keys=True, default=str)
         except Exception:
             return str(sorted(parameters.items()))
+
+    @staticmethod
+    def check_question_neutrality(question: str) -> tuple[bool, str | None]:
+        """Check whether a query question uses neutral phrasing or assumes guilt.
+
+        Returns (True, None) if neutral, or (False, reason) if leading.
+        """
+        leading_patterns = [
+            "which deployment broke",
+            "who broke",
+            "faulty deployment",
+            "bad deployment",
+            "which bad commit",
+            "faulty commit",
+            "bad configuration introduced by",
+            "culprit deployment",
+            "why did deployment break",
+        ]
+        q_lower = question.lower()
+        for p in leading_patterns:
+            if p in q_lower:
+                return False, f"Question contains leading / blame-assuming phrase '{p}'."
+        return True, None

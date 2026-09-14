@@ -21,6 +21,7 @@ from contracts.hypothesis.schemas import EvidenceCitation, Hypothesis, Hypothesi
 from contracts.incident.schemas import IncidentSeed
 from contracts.investigation.schemas import InvestigationBudget
 from reasoning.hypotheses.citation_validator import CitationValidator
+from reasoning.hypotheses.deduplicator import HypothesisDeduplicator
 from reasoning.provider.interface import ReasoningProvider
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,7 @@ class HypothesisGenerator:
     - Generates at least minimum_hypotheses (from budget/limits).
     - Ensures hypotheses have clear statement, category, component, and prediction.
     - Validates all supporting and contradicting citations with CitationValidator.
+    - Deduplicates semantically equivalent hypotheses before ranking.
     - Ensures status is 'active' for all newly generated hypotheses.
     - Enforces bias mitigation: includes at least one hypothesis unrelated to recent changes.
     """
@@ -48,9 +50,11 @@ class HypothesisGenerator:
         self,
         provider: ReasoningProvider,
         citation_validator: CitationValidator | None = None,
+        deduplicator: HypothesisDeduplicator | None = None,
     ) -> None:
         self._provider = provider
         self._citation_validator = citation_validator or CitationValidator()
+        self._deduplicator = deduplicator or HypothesisDeduplicator()
 
     async def generate(
         self,
@@ -131,7 +135,10 @@ class HypothesisGenerator:
 
             validated_hypotheses.append(cleaned_hypothesis)
 
-        # 4. Bias mitigation: ensure at least one hypothesis is NOT change-related
+        # 4. Deduplicate semantically equivalent hypotheses
+        validated_hypotheses = self._deduplicator.deduplicate(validated_hypotheses)
+
+        # 5. Bias mitigation: ensure at least one hypothesis is NOT change-related
         if len(validated_hypotheses) >= 1:
             all_change_related = all(
                 h.root_cause_category in CHANGE_RELATED_CATEGORIES
@@ -155,7 +162,7 @@ class HypothesisGenerator:
                 )
                 validated_hypotheses.append(alt_hyp)
 
-        # 5. Cap at maximum_hypotheses
+        # 6. Cap at maximum_hypotheses
         if len(validated_hypotheses) > limits.maximum_hypotheses:
             validated_hypotheses = validated_hypotheses[: limits.maximum_hypotheses]
 

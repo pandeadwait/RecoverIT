@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from collectors.fixtures.base_fixture_adapter import BaseFixtureAdapter
 from collectors.fixtures.data_loader import (
+    CANONICAL_SCENARIOS,
     SCENARIO_NAMES,
+    canonical_scenario_id,
     list_available_scenarios,
     load_scenario_json,
     load_scenario_records,
+    resolve_scenario_name,
 )
 from collectors.fixtures.replay_adapter import ReplayAdapter
 from collectors.interfaces import BaseSource
@@ -51,4 +54,7 @@ __all__ = [
     "list_available_scenarios",
     "create_scenario_adapters",
     "SCENARIO_NAMES",
+    "CANONICAL_SCENARIOS",
+    "canonical_scenario_id",
+    "resolve_scenario_name",
 ]

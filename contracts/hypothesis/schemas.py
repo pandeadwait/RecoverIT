@@ -17,6 +17,7 @@ from pydantic import Field
 from contracts.common import (
     ConfidenceLabel,
     ContractModel,
+    EvidenceRole,
     HypothesisStatus,
     InvestigationStatus,
     RootCauseCategory,
@@ -38,6 +39,10 @@ class EvidenceCitation(ContractModel):
     reason: str = Field(
         ...,
         description="How this evidence affects the hypothesis.",
+    )
+    role: EvidenceRole | str = Field(
+        default=EvidenceRole.CORRELATION,
+        description="Causal role of this evidence relative to the claim (cause, effect, correlation, contradiction, context).",
     )
 
 
@@ -161,6 +166,38 @@ class ScoreBreakdown(ContractModel):
         default=0.0,
         description="Penalty from unresolved critical information.",
     )
+    symptom_score: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=100.0,
+        description="Composite symptom coverage and corroboration score (0-100).",
+    )
+    causal_score: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=100.0,
+        description="Composite causal plausibility and timeline consistency score (0-100).",
+    )
+    capped_reason: str | None = Field(
+        default=None,
+        description="Explanation if confidence was capped despite high evidence score.",
+    )
+
+    def breakdown_rows(self) -> list[tuple[str, str, float]]:
+        """
+        Return human-readable feature name, sign ('+' or '-'), and points
+        for explainable display and report generation.
+        """
+        return [
+            ("Independent sources", "+", self.independent_source_support),
+            ("Symptom coverage", "+", self.symptom_coverage),
+            ("Temporal consistency", "+", self.temporal_consistency),
+            ("Direct change evidence", "+", self.change_consistency),
+            ("Specificity", "+", self.specificity),
+            ("Prediction support", "+", self.prediction_support),
+            ("Contradictions", "-" if self.contradiction_penalty > 0 else " ", self.contradiction_penalty),
+            ("Missing causal evidence", "-" if self.missing_evidence_penalty > 0 else " ", self.missing_evidence_penalty),
+        ]
 
 
 class RankedHypothesis(ContractModel):

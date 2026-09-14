@@ -22,6 +22,7 @@ from contracts.common import (
     ConfidenceLabel,
     ContractModel,
     InvestigationStatus,
+    SourceType,
     StopReason,
 )
 from contracts.evidence.schemas import IncidentContextSnapshot
@@ -249,15 +250,60 @@ class RankingEngine:
         cp = fc.calculate_contradiction_penalty(hypothesis, context)
         mep = fc.calculate_missing_evidence_penalty(hypothesis, context)
 
+        iss_val = round(iss * w.independent_source_support, 2)
+        sc_val = round(sc * w.symptom_coverage, 2)
+        tc_val = round(tc * w.temporal_consistency, 2)
+        cc_val = round(cc * w.change_consistency, 2)
+        spec_val = round(spec * w.specificity, 2)
+        ps_val = round(ps * w.prediction_support, 2)
+        cp_val = round(cp * w.contradiction_penalty, 2)
+        mep_val = round(mep * w.missing_evidence_penalty, 2)
+
+        # Symptom confidence sub-score (0-100)
+        symptom_score = round(min(100.0, max(0.0, sc * 100.0)), 1)
+
+        # Causal confidence sub-score (0-100): causal consistency & timeline minus missing gaps
+        max_causal = w.temporal_consistency + w.change_consistency
+        positive_causal = (tc_val + cc_val) / max_causal * 100.0 if max_causal > 0 else 0.0
+        penalty_deduction = mep * 30.0 + cp * 20.0
+        causal_score = round(max(0.0, min(100.0, positive_causal - penalty_deduction)), 1)
+
+        # Evaluate if confidence was capped despite high numeric score
+        raw_score = (iss_val + sc_val + tc_val + cc_val + spec_val + ps_val) - (cp_val + mep_val)
+        capped_reason: str | None = None
+        if raw_score >= self.thresholds.high and hypothesis.root_cause_category in fc.CHANGE_RELATED_CATEGORIES:
+            context_map = {e.evidence_id: e for e in context.evidence}
+            has_direct_causal_support = any(
+                context_map.get(c.evidence_id) is not None
+                and (
+                    context_map[c.evidence_id].evidence_type in fc.CHANGE_TYPES
+                    or context_map[c.evidence_id].source_type in (
+                        SourceType.CHANGES,
+                        SourceType.CONFIGURATION,
+                        SourceType.DEPLOYMENTS,
+                        SourceType.PIPELINES,
+                    )
+                )
+                for c in hypothesis.supporting_evidence
+            )
+            if not has_direct_causal_support:
+                capped_reason = (
+                    "Confidence capped at MEDIUM: Change regression hypothesis lacks direct causal "
+                    "evidence (change or deployment record required)."
+                )
+
         return ScoreBreakdown(
-            independent_source_support=round(iss * w.independent_source_support, 2),
-            symptom_coverage=round(sc * w.symptom_coverage, 2),
-            temporal_consistency=round(tc * w.temporal_consistency, 2),
-            change_consistency=round(cc * w.change_consistency, 2),
-            specificity=round(spec * w.specificity, 2),
-            prediction_support=round(ps * w.prediction_support, 2),
-            contradiction_penalty=round(cp * w.contradiction_penalty, 2),
-            missing_evidence_penalty=round(mep * w.missing_evidence_penalty, 2),
+            independent_source_support=iss_val,
+            symptom_coverage=sc_val,
+            temporal_consistency=tc_val,
+            change_consistency=cc_val,
+            specificity=spec_val,
+            prediction_support=ps_val,
+            contradiction_penalty=cp_val,
+            missing_evidence_penalty=mep_val,
+            symptom_score=symptom_score,
+            causal_score=causal_score,
+            capped_reason=capped_reason,
         )
 
     def calculate_evidence_score(self, breakdown: ScoreBreakdown) -> float:
@@ -279,11 +325,38 @@ class RankingEngine:
         raw_score = positive_sum - penalties
         return round(max(0.0, min(100.0, raw_score)), 2)
 
-    def derive_confidence_label(self, score: float) -> ConfidenceLabel:
+    def derive_confidence_label(
+        self,
+        score: float,
+        hypothesis: Hypothesis | None = None,
+        context: IncidentContextSnapshot | None = None,
+    ) -> ConfidenceLabel:
         """
         Derive categorical confidence label from numeric evidence score.
+
+        Enforces causal constraint: change-related hypotheses (configuration regression,
+        deployment failure, code defect) without direct causal change evidence citations
+        cannot achieve HIGH confidence regardless of score.
         """
         if score >= self.thresholds.high:
+            if hypothesis is not None and context is not None:
+                if hypothesis.root_cause_category in fc.CHANGE_RELATED_CATEGORIES:
+                    context_map = {e.evidence_id: e for e in context.evidence}
+                    has_direct_causal_support = any(
+                        context_map.get(c.evidence_id) is not None
+                        and (
+                            context_map[c.evidence_id].evidence_type in fc.CHANGE_TYPES
+                            or context_map[c.evidence_id].source_type in (
+                                SourceType.CHANGES,
+                                SourceType.CONFIGURATION,
+                                SourceType.DEPLOYMENTS,
+                                SourceType.PIPELINES,
+                            )
+                        )
+                        for c in hypothesis.supporting_evidence
+                    )
+                    if not has_direct_causal_support:
+                        return ConfidenceLabel.MEDIUM
             return ConfidenceLabel.HIGH
         if score >= self.thresholds.medium:
             return ConfidenceLabel.MEDIUM
@@ -357,7 +430,7 @@ class RankingEngine:
         for h in hypothesis_set.hypotheses:
             breakdown = self.calculate_breakdown(h, context)
             score = self.calculate_evidence_score(breakdown)
-            confidence = self.derive_confidence_label(score)
+            confidence = self.derive_confidence_label(score, hypothesis=h, context=context)
             scored_items.append((score, h.hypothesis_id, h, breakdown, confidence))
 
         # Deterministic sorting: highest score first, ties broken by hypothesis_id ascending

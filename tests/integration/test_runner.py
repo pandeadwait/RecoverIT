@@ -11,17 +11,22 @@ from recoverit.runner import InvestigationRunner
 class TestInvestigationRunner(unittest.IsolatedAsyncioTestCase):
     async def test_run_scenario_bad_db_config(self):
         runner = InvestigationRunner()
-        result = await runner.run_scenario("bad_db_config", mode="offline")
-
-        self.assertEqual(result.incident_id, "inc-bad_db_config")
+        # Test canonical ID
+        result = await runner.run_scenario("incident_001", mode="offline")
+        self.assertEqual(result.incident_id, "inc-incident_001")
         self.assertEqual(result.service, "payment-api")
         self.assertEqual(result.status, "completed")
         self.assertGreater(len(result.ranked_hypotheses), 0)
         self.assertEqual(result.ranked_hypotheses[0]["rank"], 1)
 
+        # Test legacy alias resolves to same canonical incident
+        result_alias = await runner.run_scenario("bad_db_config", mode="offline")
+        self.assertEqual(result_alias.incident_id, "inc-incident_001")
+        self.assertEqual(result_alias.service, "payment-api")
+
         # Check markdown report generation
         report = result.to_markdown_report()
-        self.assertIn("# Incident Triage Report: inc-bad_db_config", report)
+        self.assertIn("# Incident Triage Report: inc-incident_001", report)
         self.assertIn("## Ranked Root Cause Hypotheses", report)
         self.assertIn("payment-api", report)
 

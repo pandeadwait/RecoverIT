@@ -14,7 +14,11 @@ import logging
 from typing import Any
 
 from contracts.collection.schemas import SourceCapabilityCatalog
-from contracts.common import InformationPriority, SourceType
+from contracts.common import (
+    InformationGapCategory,
+    InformationPriority,
+    SourceType,
+)
 from contracts.evidence.schemas import IncidentContextSnapshot
 from contracts.hypothesis.schemas import Hypothesis
 from contracts.incident.schemas import IncidentSeed
@@ -38,6 +42,7 @@ class MissingInformationAssessor:
     - Validates missing_information items have candidate_sources present in the catalog.
     - Moves items with no available sources into unavailable_information.
     - Ensures priority uses allowed InformationPriority values.
+    - Carries forward unresolved HIGH priority items from previous round assessments.
     - Operates correctly on an empty initial context.
     """
 
@@ -55,6 +60,7 @@ class MissingInformationAssessor:
         source_capabilities: SourceCapabilityCatalog,
         context: IncidentContextSnapshot,
         active_hypotheses: list[Hypothesis] | None = None,
+        previous_assessment: MissingInformationAssessment | None = None,
     ) -> MissingInformationAssessment:
         """
         Assess current investigative progress and identify remaining gaps.
@@ -68,13 +74,19 @@ class MissingInformationAssessor:
             active_hypotheses=active,
         )
 
-        return self.validate_assessment(raw, source_capabilities, context)
+        return self.validate_assessment(
+            assessment=raw,
+            source_capabilities=source_capabilities,
+            context=context,
+            previous_assessment=previous_assessment,
+        )
 
     def validate_assessment(
         self,
         assessment: MissingInformationAssessment,
         source_capabilities: SourceCapabilityCatalog,
         context: IncidentContextSnapshot,
+        previous_assessment: MissingInformationAssessment | None = None,
     ) -> MissingInformationAssessment:
         """
         Validate and sanitize a MissingInformationAssessment against current context and catalog.
@@ -106,6 +118,7 @@ class MissingInformationAssessor:
         for item in assessment.missing_information:
             # Validate priority
             priority = self._normalize_priority(item.priority)
+            category = getattr(item, "category", InformationGapCategory.DIRECT_CAUSAL_EVIDENCE)
 
             # Filter candidate sources: must be present and available in catalog.
             # If the provider omitted candidate_sources or left it empty, consider all available sources.
@@ -125,6 +138,7 @@ class MissingInformationAssessor:
                         question=item.question,
                         reason=item.reason,
                         priority=priority,
+                        category=category,
                         candidate_sources=[
                             s for s in item.candidate_sources if s in all_catalog_sources
                         ],
@@ -138,10 +152,32 @@ class MissingInformationAssessor:
                         question=item.question,
                         reason=item.reason,
                         priority=priority,
+                        category=category,
                         candidate_sources=available_candidates,
                         resolved=item.resolved,
                     )
                 )
+
+        # 3. Carry forward unresolved HIGH priority gaps from previous assessment
+        if previous_assessment is not None:
+            existing_ids = {item.information_id for item in validated_missing}
+            existing_questions = {
+                item.question.strip().lower() for item in validated_missing
+            }
+            for prev_item in previous_assessment.missing_information:
+                if (
+                    prev_item.priority == InformationPriority.HIGH
+                    and not prev_item.resolved
+                    and prev_item.information_id not in existing_ids
+                    and prev_item.question.strip().lower() not in existing_questions
+                ):
+                    cand = [s for s in prev_item.candidate_sources if s in available_sources]
+                    if cand:
+                        validated_missing.append(
+                            prev_item.model_copy(update={"candidate_sources": cand})
+                        )
+                    else:
+                        unavailable_items.append(prev_item)
 
         recommended_stop = assessment.recommended_stop
         # If there are no missing information items left that can be queried,

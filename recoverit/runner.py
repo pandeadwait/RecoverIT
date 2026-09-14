@@ -12,7 +12,12 @@ from typing import Any, Callable
 import uuid
 
 from collectors.changes.git_adapter import LocalGitChangeAdapter
-from collectors.fixtures import create_scenario_adapters, list_available_scenarios, load_scenario_json
+from collectors.fixtures import (
+    canonical_scenario_id,
+    create_scenario_adapters,
+    list_available_scenarios,
+    load_scenario_json,
+)
 from collectors.gateway.collection_service import DefaultCollectionService
 from collectors.logs.file_adapter import FileLogAdapter
 from contracts.collection.schemas import SourceCapabilityCatalog as Person3Catalog
@@ -35,6 +40,11 @@ from reasoning.provider.llm_provider import LLMReasoningProvider
 logger = logging.getLogger(__name__)
 
 SCENARIO_PRESET_MAP: dict[str, str] = {
+    "incident_001": "deployment-regression",
+    "incident_002": "resource-exhaustion",
+    "incident_003": "dependency-incompatibility",
+    "incident_004": "database-outage",
+    "incident_005": "coincidental-deployment",
     "bad_db_config": "deployment-regression",
     "memory_exhaustion": "resource-exhaustion",
     "dependency_incompatibility": "dependency-incompatibility",
@@ -60,6 +70,9 @@ class InvestigationResult:
     log_excerpts: list[dict[str, Any]]
     budget_usage: dict[str, Any]
     provider_used: str
+    completion_criteria: dict[str, bool] = field(default_factory=dict)
+    unresolved_criteria: list[str] = field(default_factory=list)
+    scenario_name: str | None = None
 
     def to_markdown_report(self) -> str:
         """Generate a complete SRE Post-Mortem Incident Triage Report in Markdown."""
@@ -95,6 +108,35 @@ class InvestigationResult:
                     f"- **Component:** `{component}`",
                     f"- **Evidence Score:** {score:.1f} / 100",
                 ])
+
+                bd = h.get("score_breakdown", {})
+                if bd:
+                    symptom_conf = bd.get("symptom_score", 0.0)
+                    causal_conf = bd.get("causal_score", 0.0)
+                    lines.extend([
+                        f"- **Symptom Confidence:** {symptom_conf:.1f}%",
+                        f"- **Causal Confidence:** {causal_conf:.1f}%",
+                    ])
+                    if bd.get("capped_reason"):
+                        lines.append(f"> ⚠ **Confidence Capped:** {bd['capped_reason']}")
+
+                    lines.extend([
+                        "",
+                        "**Confidence Breakdown:**",
+                        "",
+                        "| Scoring Factor | Type | Points |",
+                        "|---|---|---|",
+                        f"| Independent sources | Positive | +{bd.get('independent_source_support', 0.0):.2f} |",
+                        f"| Symptom coverage | Positive | +{bd.get('symptom_coverage', 0.0):.2f} |",
+                        f"| Temporal consistency | Positive | +{bd.get('temporal_consistency', 0.0):.2f} |",
+                        f"| Direct change evidence | Positive | +{bd.get('change_consistency', 0.0):.2f} |",
+                        f"| Specificity | Positive | +{bd.get('specificity', 0.0):.2f} |",
+                        f"| Prediction support | Positive | +{bd.get('prediction_support', 0.0):.2f} |",
+                        f"| Contradictions | Penalty | -{bd.get('contradiction_penalty', 0.0):.2f} |",
+                        f"| Missing causal evidence | Penalty | -{bd.get('missing_evidence_penalty', 0.0):.2f} |",
+                        f"| **Final Evidence Score** | **Total** | **{score:.2f} / 100** |",
+                        "",
+                    ])
 
                 supporting = h.get("supporting_evidence", [])
                 if supporting:
@@ -144,7 +186,26 @@ class InvestigationResult:
                     "",
                 ])
 
+        if self.completion_criteria:
+            lines.extend([
+                "",
+                "---",
+                "",
+                "## Evidentiary Completion Status",
+                "",
+            ])
+            for crit, ok in self.completion_criteria.items():
+                mark = "[x]" if ok else "[ ]"
+                name = crit.replace("_", " ").title()
+                lines.append(f"- {mark} {name}")
+            if self.unresolved_criteria:
+                lines.append("")
+                lines.append("**Unresolved Requirements:**")
+                for item in self.unresolved_criteria:
+                    lines.append(f"- {item}")
+
         lines.extend([
+            "",
             "---",
             "",
             "## Investigation Audit & Resource Usage",
@@ -177,17 +238,18 @@ class InvestigationRunner:
 
         start_time = time.monotonic()
         data = load_scenario_json(scenario_name)
+        canonical_id = canonical_scenario_id(scenario_name)
 
         seed = Person3IncidentSeed(
-            incident_id=f"inc-{scenario_name}",
-            external_alert_id=f"alert-{scenario_name}",
+            incident_id=f"inc-{canonical_id}",
+            external_alert_id=f"alert-{canonical_id}",
             service=data["service"],
             environment="simulation",
             severity="critical",
             detected_at=data["detected_at"],
             received_at=data["detected_at"],
             summary=data["title"],
-            labels={"scenario": scenario_name},
+            labels={"environment": "simulation"},
         )
 
         registry = DefaultSourceRegistry()
@@ -311,8 +373,9 @@ class InvestigationRunner:
             provider=provider_inst,
             collection_service=col_svc,
             context_builder=ctx_bld,
-            stopping_evaluator=StoppingRuleEvaluator(min_supporting_sources_for_adequate=1),
+            stopping_evaluator=StoppingRuleEvaluator(),
             progress_callback=progress_callback,
+            provider_name=provider_name,
         )
 
         effective_budget = InvestigationBudget(
@@ -346,12 +409,24 @@ class InvestigationRunner:
         evidence_items = []
         if context and context.evidence:
             for ev in context.evidence:
+                src_rec_id = None
+                if hasattr(ev, "provenance") and ev.provenance:
+                    src_rec_id = getattr(ev.provenance, "source_record_id", None)
+                elif hasattr(ctx_bld, "coordinator") and hasattr(ctx_bld.coordinator, "evidence"):
+                    try:
+                        full_rec = ctx_bld.coordinator.evidence.get(ev.evidence_id)
+                        if full_rec and hasattr(full_rec, "provenance") and full_rec.provenance:
+                            src_rec_id = getattr(full_rec.provenance, "source_record_id", None)
+                    except Exception:
+                        pass
+
                 evidence_items.append({
                     "evidence_id": ev.evidence_id,
                     "source_type": str(ev.source_type),
                     "evidence_type": str(ev.evidence_type),
                     "event_time": ev.event_time.isoformat() if ev.event_time else None,
                     "summary": ev.summary,
+                    "source_record_id": src_rec_id,
                 })
 
         # Extract diffs from raw records
@@ -398,6 +473,12 @@ class InvestigationRunner:
         if orchestrator.budget_tracker:
             budget_usage = orchestrator.budget_tracker.get_budget_usage().model_dump(mode="json")
 
+        criteria_status = {}
+        unresolved_criteria = []
+        if orchestrator.last_stopping_decision:
+            criteria_status = orchestrator.last_stopping_decision.criteria_status
+            unresolved_criteria = orchestrator.last_stopping_decision.unresolved_criteria
+
         return InvestigationResult(
             incident_id=seed.incident_id,
             service=seed.service,
@@ -412,4 +493,7 @@ class InvestigationRunner:
             log_excerpts=log_excerpts,
             budget_usage=budget_usage,
             provider_used=provider_name,
+            completion_criteria=criteria_status,
+            unresolved_criteria=unresolved_criteria,
+            scenario_name=scenario_name,
         )

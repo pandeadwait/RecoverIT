@@ -14,7 +14,9 @@ from typing import Any
 
 from contracts.collection.schemas import SourceCapabilityCatalog
 from contracts.common import (
+    EvidenceRole,
     HypothesisStatus,
+    InformationGapCategory,
     InformationPriority,
     InformationValueLevel,
     RootCauseCategory,
@@ -93,7 +95,7 @@ class FakeReasoningProvider:
         self._calls.append({
             "method": "assess_missing_information",
             "incident_id": incident.incident_id,
-            "active_hypotheses_count": len(active_hypotheses),
+            "active_hypotheses_count": len(active_hypotheses) if active_hypotheses is not None else 0,
         })
 
         if self.custom_assessment is not None:
@@ -101,91 +103,238 @@ class FakeReasoningProvider:
 
         evidence_ids = [e.evidence_id for e in context.evidence]
 
+        ev_sources = {e.source_type for e in context.evidence}
+
         if self.preset == "database-outage":
-            known = [
-                KnownFact(
-                    statement=f"Service '{incident.service}' reported database errors.",
-                    evidence_ids=evidence_ids[:1],
-                )
-            ]
-            missing = [
-                MissingInformationItem(
-                    information_id="need_db_pool",
-                    question="Are database connection pools exhausted?",
-                    reason="High timeout count indicates connection pool starvation.",
-                    priority=InformationPriority.HIGH,
-                    candidate_sources=[SourceType.METRICS, SourceType.LOGS],
-                    resolved=False,
-                )
-            ]
+            if SourceType.METRICS not in ev_sources:
+                known = [
+                    KnownFact(
+                        statement=f"Service '{incident.service}' reported database errors.",
+                        evidence_ids=evidence_ids[:1],
+                    )
+                ]
+                missing = [
+                    MissingInformationItem(
+                        information_id="need_db_pool",
+                        question="Are database connection pools exhausted?",
+                        reason="High timeout count indicates connection pool starvation.",
+                        priority=InformationPriority.HIGH,
+                        candidate_sources=[SourceType.METRICS, SourceType.LOGS],
+                        resolved=False,
+                        category=InformationGapCategory.SYMPTOM_CONFIRMATION,
+                    )
+                ]
+            else:
+                known = [
+                    KnownFact(
+                        statement=f"Service '{incident.service}' database pool exhaustion corroborated by metrics.",
+                        evidence_ids=evidence_ids,
+                    )
+                ]
+                missing = [
+                    MissingInformationItem(
+                        information_id="need_db_pool",
+                        question="Are database connection pools exhausted?",
+                        reason="High timeout count indicates connection pool starvation.",
+                        priority=InformationPriority.HIGH,
+                        candidate_sources=[SourceType.METRICS, SourceType.LOGS],
+                        resolved=True,
+                        category=InformationGapCategory.SYMPTOM_CONFIRMATION,
+                    ),
+                    MissingInformationItem(
+                        information_id="need_db_logs",
+                        question="Are there database timeout and connection refused errors in logs?",
+                        reason="Corroborate connection pool exhaustion with instance error logs.",
+                        priority=InformationPriority.HIGH,
+                        candidate_sources=[SourceType.LOGS],
+                        resolved=SourceType.LOGS in ev_sources,
+                        category=InformationGapCategory.SYMPTOM_CONFIRMATION,
+                    ),
+                ]
         elif self.preset == "resource-exhaustion":
-            known = [
-                KnownFact(
-                    statement=f"Alert on '{incident.service}' indicates high error rate or restart.",
-                    evidence_ids=evidence_ids[:1],
-                )
-            ]
-            missing = [
-                MissingInformationItem(
-                    information_id="need_mem_metrics",
-                    question="Did memory usage exceed container cgroup limits?",
-                    reason="Investigate if container was killed by OOM killer.",
-                    priority=InformationPriority.HIGH,
-                    candidate_sources=[SourceType.METRICS, SourceType.HEALTH],
-                    resolved=False,
-                )
-            ]
+            if SourceType.METRICS not in ev_sources:
+                known = [
+                    KnownFact(
+                        statement=f"Alert on '{incident.service}' indicates high error rate or restart.",
+                        evidence_ids=evidence_ids[:1],
+                    )
+                ]
+                missing = [
+                    MissingInformationItem(
+                        information_id="need_mem_metrics",
+                        question="Did memory usage exceed container cgroup limits?",
+                        reason="Investigate if container was killed by OOM killer.",
+                        priority=InformationPriority.HIGH,
+                        candidate_sources=[SourceType.METRICS, SourceType.HEALTH],
+                        resolved=False,
+                        category=InformationGapCategory.DIRECT_CAUSAL_EVIDENCE,
+                    )
+                ]
+            else:
+                known = [
+                    KnownFact(
+                        statement=f"Alert on '{incident.service}' memory spike corroborated by metrics.",
+                        evidence_ids=evidence_ids,
+                    )
+                ]
+                missing = [
+                    MissingInformationItem(
+                        information_id="need_mem_metrics",
+                        question="Did memory usage exceed container cgroup limits?",
+                        reason="Investigate if container was killed by OOM killer.",
+                        priority=InformationPriority.HIGH,
+                        candidate_sources=[SourceType.METRICS, SourceType.HEALTH],
+                        resolved=True,
+                        category=InformationGapCategory.DIRECT_CAUSAL_EVIDENCE,
+                    ),
+                    MissingInformationItem(
+                        information_id="need_oom_logs",
+                        question="Are container OOMKilled or termination events logged?",
+                        reason="Corroborate memory metric spikes with container failure logs.",
+                        priority=InformationPriority.HIGH,
+                        candidate_sources=[SourceType.LOGS],
+                        resolved=SourceType.LOGS in ev_sources,
+                        category=InformationGapCategory.SYMPTOM_CONFIRMATION,
+                    ),
+                ]
         elif self.preset == "dependency-incompatibility":
-            known = [
-                KnownFact(
-                    statement=f"Service '{incident.service}' failed with dependency import or symbol resolution errors.",
-                    evidence_ids=evidence_ids[:1],
-                )
-            ]
-            missing = [
-                MissingInformationItem(
-                    information_id="need_dep_version",
-                    question="Which dependency or library version was updated recently?",
-                    reason="Identify incompatible transitive library upgrade.",
-                    priority=InformationPriority.HIGH,
-                    candidate_sources=[SourceType.PIPELINES, SourceType.CHANGES],
-                    resolved=False,
-                )
-            ]
+            if not any(s in ev_sources for s in (SourceType.CHANGES, SourceType.PIPELINES)):
+                known = [
+                    KnownFact(
+                        statement=f"Service '{incident.service}' failed with dependency import or symbol resolution errors.",
+                        evidence_ids=evidence_ids[:1],
+                    )
+                ]
+                missing = [
+                    MissingInformationItem(
+                        information_id="need_dep_version",
+                        question="Which dependency or library version was updated recently?",
+                        reason="Identify incompatible transitive library upgrade.",
+                        priority=InformationPriority.HIGH,
+                        candidate_sources=[SourceType.PIPELINES, SourceType.CHANGES],
+                        resolved=False,
+                        category=InformationGapCategory.DIRECT_CAUSAL_EVIDENCE,
+                    )
+                ]
+            else:
+                known = [
+                    KnownFact(
+                        statement=f"Dependency upgrade confirmed in lockfile changes.",
+                        evidence_ids=evidence_ids,
+                    )
+                ]
+                missing = [
+                    MissingInformationItem(
+                        information_id="need_dep_version",
+                        question="Which dependency or library version was updated recently?",
+                        reason="Identify incompatible transitive library upgrade.",
+                        priority=InformationPriority.HIGH,
+                        candidate_sources=[SourceType.PIPELINES, SourceType.CHANGES],
+                        resolved=True,
+                        category=InformationGapCategory.DIRECT_CAUSAL_EVIDENCE,
+                    ),
+                    MissingInformationItem(
+                        information_id="need_runtime_errors",
+                        question="Are there module import or symbol resolution errors in service logs?",
+                        reason="Corroborate dependency update with runtime failure logs.",
+                        priority=InformationPriority.HIGH,
+                        candidate_sources=[SourceType.LOGS],
+                        resolved=SourceType.LOGS in ev_sources,
+                        category=InformationGapCategory.SYMPTOM_CONFIRMATION,
+                    ),
+                ]
         elif self.preset == "coincidental-deployment":
-            known = [
-                KnownFact(
-                    statement=f"Deployment on '{incident.service}' coincided with external payment provider outage.",
-                    evidence_ids=evidence_ids[:1],
-                )
-            ]
-            missing = [
-                MissingInformationItem(
-                    information_id="need_ext_health",
-                    question="Is the external dependency or upstream provider down independently?",
-                    reason="Verify whether the coincident deployment is causal or merely temporal.",
-                    priority=InformationPriority.HIGH,
-                    candidate_sources=[SourceType.HEALTH, SourceType.LOGS],
-                    resolved=False,
-                )
-            ]
+            if not any(s in ev_sources for s in (SourceType.HEALTH, SourceType.LOGS)):
+                known = [
+                    KnownFact(
+                        statement=f"Deployment on '{incident.service}' coincided with external payment provider outage.",
+                        evidence_ids=evidence_ids[:1],
+                    )
+                ]
+                missing = [
+                    MissingInformationItem(
+                        information_id="need_ext_health",
+                        question="Is the external dependency or upstream provider down independently?",
+                        reason="Verify whether the coincident deployment is causal or merely temporal.",
+                        priority=InformationPriority.HIGH,
+                        candidate_sources=[SourceType.HEALTH, SourceType.LOGS],
+                        resolved=False,
+                        category=InformationGapCategory.CONTRADICTING_EVIDENCE,
+                    )
+                ]
+            else:
+                known = [
+                    KnownFact(
+                        statement=f"External gateway health degradation confirmed.",
+                        evidence_ids=evidence_ids,
+                    )
+                ]
+                missing = [
+                    MissingInformationItem(
+                        information_id="need_ext_health",
+                        question="Is the external dependency or upstream provider down independently?",
+                        reason="Verify whether the coincident deployment is causal or merely temporal.",
+                        priority=InformationPriority.HIGH,
+                        candidate_sources=[SourceType.HEALTH, SourceType.LOGS],
+                        resolved=True,
+                        category=InformationGapCategory.CONTRADICTING_EVIDENCE,
+                    ),
+                    MissingInformationItem(
+                        information_id="need_deploy_diff",
+                        question="Did the coincidental deployment modify payment components?",
+                        reason="Verify if deployment was causal or purely coincidental.",
+                        priority=InformationPriority.HIGH,
+                        candidate_sources=[SourceType.DEPLOYMENTS],
+                        resolved=any(s in ev_sources for s in (SourceType.DEPLOYMENTS, SourceType.CHANGES)),
+                        category=InformationGapCategory.DIRECT_CAUSAL_EVIDENCE,
+                    ),
+                ]
         else:  # default: deployment-regression
-            known = [
-                KnownFact(
-                    statement=f"Alert '{incident.summary}' detected on service '{incident.service}'.",
-                    evidence_ids=evidence_ids[:1],
-                )
-            ]
-            missing = [
-                MissingInformationItem(
-                    information_id="need_deploy_history",
-                    question="Was a deployment completed shortly before the error increase?",
-                    reason="Distinguishes recent-change regression from an independent outage.",
-                    priority=InformationPriority.HIGH,
-                    candidate_sources=[SourceType.DEPLOYMENTS, SourceType.CHANGES],
-                    resolved=False,
-                )
-            ]
+            if not any(s in ev_sources for s in (SourceType.DEPLOYMENTS, SourceType.CHANGES)):
+                known = [
+                    KnownFact(
+                        statement=f"Alert '{incident.summary}' detected on service '{incident.service}'.",
+                        evidence_ids=evidence_ids[:1],
+                    )
+                ]
+                missing = [
+                    MissingInformationItem(
+                        information_id="need_deploy_history",
+                        question="Was a deployment completed shortly before the error increase?",
+                        reason="Distinguishes recent-change regression from an independent outage.",
+                        priority=InformationPriority.HIGH,
+                        candidate_sources=[SourceType.DEPLOYMENTS, SourceType.CHANGES],
+                        resolved=False,
+                        category=InformationGapCategory.DIRECT_CAUSAL_EVIDENCE,
+                    )
+                ]
+            else:
+                known = [
+                    KnownFact(
+                        statement=f"Recent deployment verified on '{incident.service}'.",
+                        evidence_ids=evidence_ids,
+                    )
+                ]
+                missing = [
+                    MissingInformationItem(
+                        information_id="need_deploy_history",
+                        question="Was a deployment completed shortly before the error increase?",
+                        reason="Distinguishes recent-change regression from an independent outage.",
+                        priority=InformationPriority.HIGH,
+                        candidate_sources=[SourceType.DEPLOYMENTS, SourceType.CHANGES],
+                        resolved=True,
+                        category=InformationGapCategory.DIRECT_CAUSAL_EVIDENCE,
+                    ),
+                    MissingInformationItem(
+                        information_id="need_error_logs",
+                        question="Are there application error logs corresponding to this deployment?",
+                        reason="Corroborate deployment change with runtime error symptoms.",
+                        priority=InformationPriority.HIGH,
+                        candidate_sources=[SourceType.LOGS],
+                        resolved=SourceType.LOGS in ev_sources,
+                        category=InformationGapCategory.SYMPTOM_CONFIRMATION,
+                    ),
+                ]
 
         return MissingInformationAssessment(
             incident_id=incident.incident_id,
@@ -219,81 +368,199 @@ class FakeReasoningProvider:
             else "payment-api"
         )
 
+        ev_sources = {e.source_type for e in context.evidence}
+
+        metric_cap = next(
+            (s for s in source_capabilities.sources if s.source_type == SourceType.METRICS),
+            None,
+        )
+        metric_key = (
+            "metric"
+            if (metric_cap and "metric" in metric_cap.supported_query_fields and "metric_name" not in metric_cap.supported_query_fields)
+            else "metric_name"
+        )
+
         if self.preset == "database-outage":
-            queries = [
-                EvidenceQueryPlanQuery(
-                    query_id="qry_db_pool_01",
-                    source_type=SourceType.METRICS,
-                    question="What is current connection pool utilization?",
-                    parameters={
-                        "metric": "db_connections_active",
-                        "service": "payment-db",
-                        "limit": 50,
-                    },
-                    related_information_ids=["need_db_pool"],
-                    discriminates_hypothesis_ids=["hyp_01", "hyp_02"],
-                    expected_information_value=InformationValueLevel.HIGH,
-                )
-            ]
+            if SourceType.METRICS not in ev_sources:
+                queries = [
+                    EvidenceQueryPlanQuery(
+                        query_id="qry_db_pool_01",
+                        source_type=SourceType.METRICS,
+                        question="What is current connection pool or database error metric?",
+                        parameters={
+                            metric_key: "http_500_rate",
+                            "service": incident_service,
+                            "limit": 50,
+                        },
+                        related_information_ids=["need_db_pool"],
+                        discriminates_hypothesis_ids=["hyp_01", "hyp_02"],
+                        expected_information_value=InformationValueLevel.HIGH,
+                    )
+                ]
+            else:
+                queries = [
+                    EvidenceQueryPlanQuery(
+                        query_id="qry_db_log_01",
+                        source_type=SourceType.LOGS,
+                        question="Are there database timeout and connection refused errors in logs?",
+                        parameters={
+                            "service": incident_service,
+                            "severity": ["error", "warning", "critical"],
+                            "limit": 20,
+                        },
+                        related_information_ids=["need_db_logs"],
+                        discriminates_hypothesis_ids=["hyp_01", "hyp_02"],
+                        expected_information_value=InformationValueLevel.HIGH,
+                    )
+                ]
         elif self.preset == "resource-exhaustion":
-            queries = [
-                EvidenceQueryPlanQuery(
-                    query_id="qry_mem_01",
-                    source_type=SourceType.METRICS,
-                    question="What is the container memory usage trend?",
-                    parameters={
-                        "metric": "container_memory_working_set_bytes",
-                        "limit": 100,
-                    },
-                    related_information_ids=["need_mem_metrics"],
-                    discriminates_hypothesis_ids=["hyp_01", "hyp_02"],
-                    expected_information_value=InformationValueLevel.HIGH,
-                )
-            ]
+            if SourceType.METRICS not in ev_sources:
+                queries = [
+                    EvidenceQueryPlanQuery(
+                        query_id="qry_mem_01",
+                        source_type=SourceType.METRICS,
+                        question="What is the container memory usage trend?",
+                        parameters={
+                            metric_key: "container_memory_usage_bytes",
+                            "service": incident_service,
+                            "limit": 100,
+                        },
+                        related_information_ids=["need_mem_metrics"],
+                        discriminates_hypothesis_ids=["hyp_01", "hyp_02"],
+                        expected_information_value=InformationValueLevel.HIGH,
+                    )
+                ]
+            else:
+                queries = [
+                    EvidenceQueryPlanQuery(
+                        query_id="qry_mem_log_01",
+                        source_type=SourceType.LOGS,
+                        question="Are there container OOMKilled or termination events in logs?",
+                        parameters={
+                            "service": incident_service,
+                            "severity": ["error", "warning", "critical"],
+                            "limit": 20,
+                        },
+                        related_information_ids=["need_oom_logs"],
+                        discriminates_hypothesis_ids=["hyp_01", "hyp_02"],
+                        expected_information_value=InformationValueLevel.HIGH,
+                    )
+                ]
         elif self.preset == "dependency-incompatibility":
-            queries = [
-                EvidenceQueryPlanQuery(
-                    query_id="qry_dep_01",
-                    source_type=SourceType.CHANGES,
-                    question="What dependencies were modified in the build or package lockfiles?",
-                    parameters={
-                        "service": incident_service,
-                        "limit": 10,
-                    },
-                    related_information_ids=["need_dep_version"],
-                    discriminates_hypothesis_ids=["hyp_01", "hyp_02"],
-                    expected_information_value=InformationValueLevel.HIGH,
-                )
-            ]
+            if not any(s in ev_sources for s in (SourceType.CHANGES, SourceType.PIPELINES)):
+                queries = [
+                    EvidenceQueryPlanQuery(
+                        query_id="qry_dep_01",
+                        source_type=SourceType.CHANGES,
+                        question="What dependencies were modified in the build or package lockfiles?",
+                        parameters={
+                            "service": incident_service,
+                            "limit": 10,
+                        },
+                        related_information_ids=["need_dep_version"],
+                        discriminates_hypothesis_ids=["hyp_01", "hyp_02"],
+                        expected_information_value=InformationValueLevel.HIGH,
+                    )
+                ]
+            else:
+                queries = [
+                    EvidenceQueryPlanQuery(
+                        query_id="qry_dep_log_01",
+                        source_type=SourceType.LOGS,
+                        question="Are there module import or symbol resolution errors in service logs?",
+                        parameters={
+                            "service": incident_service,
+                            "severity": ["error", "warning", "critical"],
+                            "limit": 20,
+                        },
+                        related_information_ids=["need_runtime_errors"],
+                        discriminates_hypothesis_ids=["hyp_01", "hyp_02"],
+                        expected_information_value=InformationValueLevel.HIGH,
+                    )
+                ]
         elif self.preset == "coincidental-deployment":
-            queries = [
-                EvidenceQueryPlanQuery(
-                    query_id="qry_ext_health_01",
-                    source_type=SourceType.HEALTH,
-                    question="What is the availability status of the external payment gateway?",
-                    parameters={
-                        "service": "payment-gateway",
-                    },
-                    related_information_ids=["need_ext_health"],
-                    discriminates_hypothesis_ids=["hyp_01", "hyp_02"],
-                    expected_information_value=InformationValueLevel.HIGH,
+            if not any(s in ev_sources for s in (SourceType.HEALTH, SourceType.LOGS)):
+                has_health = any(
+                    s.source_type == SourceType.HEALTH and s.available
+                    for s in source_capabilities.sources
                 )
-            ]
+                if has_health:
+                    queries = [
+                        EvidenceQueryPlanQuery(
+                            query_id="qry_ext_health_01",
+                            source_type=SourceType.HEALTH,
+                            question="What is the availability status of the external payment gateway?",
+                            parameters={
+                                "service": "payment-gateway",
+                            },
+                            related_information_ids=["need_ext_health"],
+                            discriminates_hypothesis_ids=["hyp_01", "hyp_02"],
+                            expected_information_value=InformationValueLevel.HIGH,
+                        )
+                    ]
+                else:
+                    queries = [
+                        EvidenceQueryPlanQuery(
+                            query_id="qry_ext_log_01",
+                            source_type=SourceType.LOGS,
+                            question="Are there external payment gateway errors or timeouts?",
+                            parameters={
+                                "service": incident_service,
+                                "severity": ["error", "warning", "critical"],
+                                "limit": 10,
+                            },
+                            related_information_ids=["need_ext_health"],
+                            discriminates_hypothesis_ids=["hyp_01", "hyp_02"],
+                            expected_information_value=InformationValueLevel.HIGH,
+                        )
+                    ]
+            else:
+                queries = [
+                    EvidenceQueryPlanQuery(
+                        query_id="qry_deploy_01",
+                        source_type=SourceType.DEPLOYMENTS,
+                        question="Which deployments completed shortly before the error increase?",
+                        parameters={
+                            "service": incident_service,
+                            "limit": 10,
+                        },
+                        related_information_ids=["need_deploy_diff"],
+                        discriminates_hypothesis_ids=["hyp_01", "hyp_02"],
+                        expected_information_value=InformationValueLevel.HIGH,
+                    )
+                ]
         else:  # deployment-regression
-            queries = [
-                EvidenceQueryPlanQuery(
-                    query_id="qry_deploy_01",
-                    source_type=SourceType.DEPLOYMENTS,
-                    question="Which deployments completed shortly before the error increase?",
-                    parameters={
-                        "service": incident_service,
-                        "limit": 10,
-                    },
-                    related_information_ids=["need_deploy_history"],
-                    discriminates_hypothesis_ids=["hyp_01", "hyp_02"],
-                    expected_information_value=InformationValueLevel.HIGH,
-                )
-            ]
+            if not any(s in ev_sources for s in (SourceType.DEPLOYMENTS, SourceType.CHANGES)):
+                queries = [
+                    EvidenceQueryPlanQuery(
+                        query_id="qry_deploy_01",
+                        source_type=SourceType.DEPLOYMENTS,
+                        question="Which deployments completed shortly before the error increase?",
+                        parameters={
+                            "service": incident_service,
+                            "limit": 10,
+                        },
+                        related_information_ids=["need_deploy_history"],
+                        discriminates_hypothesis_ids=["hyp_01", "hyp_02"],
+                        expected_information_value=InformationValueLevel.HIGH,
+                    )
+                ]
+            else:
+                queries = [
+                    EvidenceQueryPlanQuery(
+                        query_id="qry_log_01",
+                        source_type=SourceType.LOGS,
+                        question="Are there application error logs corresponding to this deployment?",
+                        parameters={
+                            "service": incident_service,
+                            "severity": ["error", "warning", "critical"],
+                            "limit": 20,
+                        },
+                        related_information_ids=["need_error_logs"],
+                        discriminates_hypothesis_ids=["hyp_01", "hyp_02"],
+                        expected_information_value=InformationValueLevel.HIGH,
+                    )
+                ]
 
         return EvidenceQueryPlan(
             incident_id=missing_information.incident_id,
@@ -330,7 +597,11 @@ class FakeReasoningProvider:
                     root_cause_category=RootCauseCategory.RESOURCE_EXHAUSTION,
                     affected_component=incident.service,
                     supporting_evidence=[
-                        EvidenceCitation(evidence_id=eid, reason="Connection errors logged.")
+                        EvidenceCitation(
+                            evidence_id=eid,
+                            reason="Connection pool exhaustion metrics detected.",
+                            role=EvidenceRole.CAUSE,
+                        )
                         for eid in evidence_ids[:1]
                     ],
                     contradicting_evidence=[],
@@ -362,7 +633,11 @@ class FakeReasoningProvider:
                     root_cause_category=RootCauseCategory.RESOURCE_EXHAUSTION,
                     affected_component=incident.service,
                     supporting_evidence=[
-                        EvidenceCitation(evidence_id=eid, reason="Memory usage spike observed.")
+                        EvidenceCitation(
+                            evidence_id=eid,
+                            reason="Memory usage spike observed.",
+                            role=EvidenceRole.CAUSE,
+                        )
                         for eid in evidence_ids[:1]
                     ],
                     contradicting_evidence=[],
@@ -394,7 +669,11 @@ class FakeReasoningProvider:
                     root_cause_category=RootCauseCategory.DEPENDENCY_INCOMPATIBILITY,
                     affected_component=incident.service,
                     supporting_evidence=[
-                        EvidenceCitation(evidence_id=eid, reason="Module resolution error logged.")
+                        EvidenceCitation(
+                            evidence_id=eid,
+                            reason="Incompatible dependency introduced in lockfile change.",
+                            role=EvidenceRole.CAUSE,
+                        )
                         for eid in evidence_ids[:1]
                     ],
                     contradicting_evidence=[],
@@ -426,7 +705,11 @@ class FakeReasoningProvider:
                     root_cause_category=RootCauseCategory.EXTERNAL_DEPENDENCY_FAILURE,
                     affected_component="payment-gateway",
                     supporting_evidence=[
-                        EvidenceCitation(evidence_id=eid, reason="External gateway timeouts reported.")
+                        EvidenceCitation(
+                            evidence_id=eid,
+                            reason="External gateway timeouts reported.",
+                            role=EvidenceRole.CAUSE,
+                        )
                         for eid in evidence_ids[:1]
                     ],
                     contradicting_evidence=[],
@@ -458,7 +741,11 @@ class FakeReasoningProvider:
                     root_cause_category=RootCauseCategory.CONFIGURATION_REGRESSION,
                     affected_component=incident.service,
                     supporting_evidence=[
-                        EvidenceCitation(evidence_id=eid, reason="500 errors began after deployment.")
+                        EvidenceCitation(
+                            evidence_id=eid,
+                            reason="500 errors began after deployment.",
+                            role=EvidenceRole.CAUSE,
+                        )
                         for eid in evidence_ids[:1]
                     ],
                     contradicting_evidence=[],
@@ -502,19 +789,33 @@ class FakeReasoningProvider:
             return self.custom_revised_hypotheses
 
         now = datetime.now(timezone.utc)
-        evidence_ids = [e.evidence_id for e in new_context.evidence]
+        ev_map = {e.evidence_id: e for e in new_context.evidence}
 
         revised: list[Hypothesis] = []
         for i, h in enumerate(previous_hypotheses.hypotheses):
             if i == 0:
                 # Top hypothesis strengthened
                 new_citations = list(h.supporting_evidence)
-                for eid in evidence_ids:
-                    if not any(c.evidence_id == eid for c in new_citations):
+                existing_ids = {c.evidence_id for c in new_citations}
+                for eid, ev in ev_map.items():
+                    if eid not in existing_ids:
+                        if ev.source_type in (SourceType.LOGS, SourceType.METRICS):
+                            role = EvidenceRole.EFFECT
+                            reason = "Corroborating runtime symptom observed in logs/metrics."
+                        elif ev.source_type in (SourceType.DEPLOYMENTS, SourceType.CHANGES, SourceType.CONFIGURATION):
+                            role = EvidenceRole.CAUSE
+                            reason = "Corroborating change record confirmed."
+                        elif ev.source_type == SourceType.HEALTH:
+                            role = EvidenceRole.CAUSE
+                            reason = "Upstream provider degradation confirmed."
+                        else:
+                            role = EvidenceRole.CORRELATION
+                            reason = "Corroborating evidence found in new round."
                         new_citations.append(
                             EvidenceCitation(
                                 evidence_id=eid,
-                                reason="Additional corroborating evidence found in new round.",
+                                reason=reason,
+                                role=role,
                             )
                         )
                 revised.append(

@@ -52,6 +52,7 @@ from contracts.evidence.schemas import (
 )
 from contracts.hypothesis.schemas import (
     EvidenceCitation,
+    EvidenceRole,
     Hypothesis,
     HypothesisSet,
     RankedHypothesisSet,
@@ -533,10 +534,19 @@ def test_stopping_evaluator_adequate_coverage(
                 root_cause_category=RootCauseCategory.DEPLOYMENT_FAILURE,
                 affected_component="svc",
                 supporting_evidence=[
-                    EvidenceCitation(evidence_id="ev_deploy_01", reason="r1"),
-                    EvidenceCitation(evidence_id="ev_log_01", reason="r2"),
+                    EvidenceCitation(evidence_id="ev_deploy_01", reason="r1", role=EvidenceRole.CAUSE),
+                    EvidenceCitation(evidence_id="ev_log_01", reason="r2", role=EvidenceRole.EFFECT),
                 ],
-            )
+            ),
+            Hypothesis(
+                hypothesis_id="h2",
+                incident_id="inc_01",
+                statement="Alternative statement",
+                root_cause_category=RootCauseCategory.INFRASTRUCTURE_FAILURE,
+                affected_component="svc",
+                supporting_evidence=[],
+                status=HypothesisStatus.WEAKENED,
+            ),
         ],
         generated_at=datetime.now(timezone.utc),
     )

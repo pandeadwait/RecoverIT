@@ -168,7 +168,15 @@ def calculate_change_consistency(
         context_map = {e.evidence_id: e for e in context.evidence}
         cites_change = any(
             context_map.get(c.evidence_id) is not None
-            and context_map[c.evidence_id].evidence_type in CHANGE_TYPES
+            and (
+                context_map[c.evidence_id].evidence_type in CHANGE_TYPES
+                or context_map[c.evidence_id].source_type in (
+                    SourceType.CHANGES,
+                    SourceType.CONFIGURATION,
+                    SourceType.DEPLOYMENTS,
+                    SourceType.PIPELINES,
+                )
+            )
             for c in hypothesis.supporting_evidence
         )
         return 1.0 if cites_change else 0.4

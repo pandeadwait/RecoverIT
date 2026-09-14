@@ -144,6 +144,21 @@ class InformationPriority(StrEnum):
     HIGH = "high"
 
 
+class InformationGapCategory(StrEnum):
+    SYMPTOM_CONFIRMATION = "symptom_confirmation"
+    TEMPORAL_CORRELATION = "temporal_correlation"
+    DIRECT_CAUSAL_EVIDENCE = "direct_causal_evidence"
+    CONTRADICTING_EVIDENCE = "contradicting_evidence"
+
+
+class EvidenceRole(StrEnum):
+    CAUSE = "cause"
+    EFFECT = "effect"
+    CORRELATION = "correlation"
+    CONTRADICTION = "contradiction"
+    CONTEXT = "context"
+
+
 class InvestigationState(StrEnum):
     RECEIVED = "RECEIVED"
     ASSESSING_GAPS = "ASSESSING_GAPS"

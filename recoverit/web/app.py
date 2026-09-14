@@ -12,7 +12,12 @@ from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from collectors.fixtures import list_available_scenarios, load_scenario_json
+from collectors.fixtures import (
+    canonical_scenario_id,
+    list_available_scenarios,
+    load_scenario_json,
+    resolve_scenario_name,
+)
 from recoverit.runner import InvestigationRunner
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -34,35 +39,35 @@ app.add_middleware(
 runner = InvestigationRunner()
 
 SCENARIO_METADATA = {
-    "bad_db_config": {
+    "incident_001": {
         "title": "[P1 CRITICAL] HTTP 500 Spike on payment-api (>35% failure rate)",
         "service": "payment-api",
         "category": "High Error Rate Alert",
         "severity": "CRITICAL",
         "description": "Alert triggered by Prometheus: payment-api error rate exceeded 30% threshold over a 5-minute evaluation window.",
     },
-    "memory_exhaustion": {
+    "incident_002": {
         "title": "[P1 CRITICAL] Worker Pod CrashLoopBackOff on order-api (Exit Code 137)",
         "service": "order-api",
         "category": "Container Eviction Alert",
         "severity": "CRITICAL",
         "description": "Alert triggered by Kubernetes: 4 worker pods terminated unexpectedly with exit code 137 (OOMKilled) in production.",
     },
-    "dependency_incompatibility": {
+    "incident_003": {
         "title": "[P2 HIGH] Service Startup Failure on auth-service after build",
         "service": "auth-service",
         "category": "Deployment Crash Alert",
         "severity": "HIGH",
         "description": "Alert triggered by CI/CD pipeline: auth-service canary instance failing container health checks on port 8080.",
     },
-    "real_db_outage": {
+    "incident_004": {
         "title": "[P1 CRITICAL] Database Connection Pool Exhaustion on billing-api",
         "service": "billing-api",
         "category": "Infrastructure Outage Alert",
         "severity": "CRITICAL",
         "description": "Alert triggered by Datadog: 0 of 50 PostgreSQL connections available across billing service instances.",
     },
-    "coincidental_deployment": {
+    "incident_005": {
         "title": "[P1 CRITICAL] Checkout Failure Rate Surge on checkout-api",
         "service": "checkout-api",
         "category": "Transaction Failure Alert",
@@ -71,9 +76,16 @@ SCENARIO_METADATA = {
     },
 }
 
+# Alias backwards compatibility
+SCENARIO_METADATA["bad_db_config"] = SCENARIO_METADATA["incident_001"]
+SCENARIO_METADATA["memory_exhaustion"] = SCENARIO_METADATA["incident_002"]
+SCENARIO_METADATA["dependency_incompatibility"] = SCENARIO_METADATA["incident_003"]
+SCENARIO_METADATA["real_db_outage"] = SCENARIO_METADATA["incident_004"]
+SCENARIO_METADATA["coincidental_deployment"] = SCENARIO_METADATA["incident_005"]
+
 
 class InvestigationRequest(BaseModel):
-    scenario: str = Field(default="bad_db_config")
+    scenario: str = Field(default="incident_001")
     mode: str = Field(default="auto")
     provider: str = Field(default="auto")
     model: str | None = Field(default=None)
@@ -87,11 +99,13 @@ class InvestigationRequest(BaseModel):
 async def get_scenarios() -> list[dict[str, Any]]:
     """Return available incident benchmark scenarios."""
     scenarios = []
-    for sid in list_available_scenarios():
+    for sid in list_available_scenarios(only_canonical=True):
+        alias = resolve_scenario_name(sid)
         meta = SCENARIO_METADATA.get(sid, {})
         data = load_scenario_json(sid)
         scenarios.append({
             "id": sid,
+            "alias": alias,
             "title": meta.get("title", data.get("title", sid)),
             "service": meta.get("service", data.get("service", "unknown")),
             "category": meta.get("category", "General"),

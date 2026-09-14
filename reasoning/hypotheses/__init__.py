@@ -4,6 +4,9 @@ from reasoning.hypotheses.citation_validator import (
     CitationValidationReport,
     CitationValidator,
 )
+from reasoning.hypotheses.deduplicator import (
+    HypothesisDeduplicator,
+)
 from reasoning.hypotheses.generator import (
     CHANGE_RELATED_CATEGORIES,
     HypothesisGenerator,
@@ -16,6 +19,7 @@ __all__ = [
     "CHANGE_RELATED_CATEGORIES",
     "CitationValidationReport",
     "CitationValidator",
+    "HypothesisDeduplicator",
     "HypothesisGenerator",
     "HypothesisReviser",
 ]

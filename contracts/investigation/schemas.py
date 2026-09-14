@@ -16,6 +16,7 @@ from pydantic import AliasChoices, Field, model_validator
 
 from contracts.common import (
     ContractModel,
+    InformationGapCategory,
     InformationPriority,
     InformationValueLevel,
     SourceType,
@@ -118,6 +119,10 @@ class MissingInformationItem(ContractModel):
     candidate_sources: list[SourceType] = Field(
         default_factory=list,
         description="Source types that could answer this question.",
+    )
+    category: InformationGapCategory | str = Field(
+        default=InformationGapCategory.DIRECT_CAUSAL_EVIDENCE,
+        description="Classification of this information gap.",
     )
     resolved: bool = Field(
         default=False,

@@ -262,8 +262,14 @@ class LLMReasoningProvider:
             "You are an expert SRE incident investigator. Analyze the incident, "
             "established facts in the context snapshot, and available source capabilities. "
             "Identify what information is known and what critical questions must still be answered. "
+            "Classify each missing_information item with category ('symptom_confirmation', "
+            "'temporal_correlation', 'direct_causal_evidence', 'contradicting_evidence'). "
+            "Phrase questions neutrally without assuming guilt (e.g. 'Were any relevant configuration "
+            "or code changes introduced before the alert?' instead of 'Which deployment broke the service?'). "
+            "Require direct causal evidence when investigating change-related explanations, and always "
+            "include at least one question testing an alternative explanation or attempting to disprove the leading hypothesis. "
             "For each item in missing_information, populate candidate_sources with relevant available "
-            "source types (e.g. 'changes', 'logs'). Return valid JSON matching the MissingInformationAssessment schema."
+            "source types (e.g. 'changes', 'logs', 'configuration'). Return valid JSON matching the MissingInformationAssessment schema."
         )
 
         assessment: MissingInformationAssessment = await self._execute_structured_call(
@@ -328,10 +334,13 @@ class LLMReasoningProvider:
         system_instruction = (
             "You are an expert SRE incident investigator. Generate an EvidenceQueryPlan "
             "to answer missing information questions. Ensure every query uses only supported "
-            "fields from available sources in the catalog. Center every time range on the "
-            "incident detected_at timestamp, keep it within maximum_window_seconds, and use "
-            "the incident's exact service name. Return valid JSON matching the "
-            "EvidenceQueryPlan schema."
+            "fields from available sources in the catalog. Phrase query questions neutrally without "
+            "assuming a deployment or configuration change is causal. Populate related_information_ids "
+            "and discriminates_hypothesis_ids for every query. Require direct-cause queries (from 'changes', "
+            "'configuration', or 'deployments') when investigating change-related hypotheses, and include at "
+            "least one query that can test or disprove the leading hypothesis against alternatives. "
+            "Center every time range on the incident detected_at timestamp, keep it within maximum_window_seconds, "
+            "and use the incident's exact service name. Return valid JSON matching the EvidenceQueryPlan schema."
         )
 
         plan: EvidenceQueryPlan = await self._execute_structured_call(
@@ -424,6 +433,11 @@ class LLMReasoningProvider:
             "You are an expert SRE incident investigator. Formulate plausible root-cause "
             "hypotheses for the incident. Every hypothesis must cite evidence IDs from the context, "
             "provide testable predictions, and consider alternative non-change explanations. "
+            "For each citation, specify 'role': 'cause', 'effect', 'correlation', 'contradiction', or 'context'. "
+            "CRITICAL CAUSAL RULES: "
+            "1. Logs and metrics describe impact/symptoms and MUST NOT be cited with role='cause' for configuration regressions or deployment failures (use 'effect' or 'correlation'). "
+            "2. Hypotheses claiming configuration_regression or deployment_failure must cite direct change/deployment evidence to be strongly supported. "
+            "3. Include alternative non-change explanations and cite any contradicting evidence. "
             "Return valid JSON matching the HypothesisSet schema."
         )
 
@@ -452,6 +466,8 @@ class LLMReasoningProvider:
             "You are an expert SRE incident investigator. Update the hypotheses in light of new "
             "evidence. Strengthen, weaken, or reject hypotheses. Do not drop rejected hypotheses; "
             "keep them with status 'rejected'. Increment revision numbers. "
+            "For each citation, specify 'role': 'cause', 'effect', 'correlation', 'contradiction', or 'context'. "
+            "Logs and metrics demonstrate effect or correlation, not direct cause of change regressions. "
             "Return valid JSON matching the HypothesisSet schema."
         )
 
@@ -619,6 +635,23 @@ class LLMReasoningProvider:
     # Prompt Builders
     # -----------------------------------------------------------------------
 
+    @staticmethod
+    def _sanitize_incident_for_prompt(incident: Any) -> dict[str, Any]:
+        """Expose only neutral, observable incident symptoms to the LLM without answer leakage."""
+        sev = incident.severity.value if hasattr(incident.severity, "value") else str(incident.severity)
+        det_at = (
+            incident.detected_at.isoformat()
+            if hasattr(incident.detected_at, "isoformat")
+            else str(incident.detected_at)
+        )
+        return {
+            "service": incident.service,
+            "environment": incident.environment,
+            "severity": sev,
+            "detected_at": det_at,
+            "alert": incident.summary,
+        }
+
     def _build_assess_prompt(
         self,
         incident: IncidentSeed,
@@ -627,7 +660,7 @@ class LLMReasoningProvider:
         active_hypotheses: list[Hypothesis],
     ) -> str:
         payload = {
-            "incident": incident.model_dump(mode="json"),
+            "incident": self._sanitize_incident_for_prompt(incident),
             "source_capabilities": source_capabilities.model_dump(mode="json"),
             "context_summary": {
                 "snapshot_id": context.snapshot_id,
@@ -650,7 +683,12 @@ class LLMReasoningProvider:
         return (
             f"Prompt Version: {PROMPT_VERSION_ASSESS}\n"
             f"Available source types in the catalog: {available_source_types}\n"
-            f"CRITICAL: In 'missing_information', specify relevant available source types in 'candidate_sources' (e.g. ['changes', 'logs']).\n\n"
+            "CRITICAL RULES:\n"
+            "1. Classify each missing_information item with 'category' (symptom_confirmation, temporal_correlation, direct_causal_evidence, or contradicting_evidence).\n"
+            "2. Phrase all questions neutrally without leading or blame-assuming words.\n"
+            "3. If investigating possible regressions or changes, actively include gaps seeking direct causal evidence ('configuration', 'changes').\n"
+            "4. Always include at least one information gap that tests an alternative explanation or could disprove the leading hypothesis.\n"
+            "5. In 'missing_information', specify relevant available source types in 'candidate_sources' (e.g. ['changes', 'logs', 'configuration']).\n\n"
             f"Assess missing information for this incident:\n"
             f"{json.dumps(payload, indent=2)}"
         )
@@ -668,7 +706,7 @@ class LLMReasoningProvider:
             "budget": budget.model_dump(mode="json"),
             "context_snapshot_id": context.snapshot_id,
             "context_created_at": context.created_at.isoformat(),
-            "incident": context.incident.model_dump(mode="json"),
+            "incident": self._sanitize_incident_for_prompt(context.incident),
         }
         allowed_params = {
             (s.source_type.value if hasattr(s.source_type, "value") else str(s.source_type)): s.supported_query_fields
@@ -679,8 +717,13 @@ class LLMReasoningProvider:
             f"Prompt Version: {PROMPT_VERSION_PLAN}\n"
             f"Allowed query parameter fields for available sources:\n"
             f"{json.dumps(allowed_params, indent=2)}\n\n"
-            "CRITICAL: use the incident's exact service and detected_at timestamp. "
-            "Every time range must be no larger than that source's maximum_window_seconds.\n\n"
+            "CRITICAL RULES:\n"
+            "1. Use the incident's exact service and detected_at timestamp.\n"
+            "2. Every time range must be no larger than that source's maximum_window_seconds.\n"
+            "3. Phrase query questions neutrally; do NOT assume a change or deployment is causal.\n"
+            "4. Populate 'related_information_ids' and 'discriminates_hypothesis_ids' for every query.\n"
+            "5. Seek direct causal evidence ('configuration', 'changes', 'deployments') when investigating change-related hypotheses.\n"
+            "6. Include at least one query that can test an alternative hypothesis or disprove the leading explanation.\n\n"
             f"Plan queries for missing information (only use allowed fields above for each source):\n"
             f"{json.dumps(payload, indent=2)}"
         )
@@ -691,13 +734,20 @@ class LLMReasoningProvider:
         context: IncidentContextSnapshot,
         limits: InvestigationBudget,
     ) -> str:
+        context_dump = context.model_dump(mode="json")
+        context_dump["incident"] = self._sanitize_incident_for_prompt(context.incident)
         payload = {
-            "incident": incident.model_dump(mode="json"),
-            "context": context.model_dump(mode="json"),
+            "incident": self._sanitize_incident_for_prompt(incident),
+            "context": context_dump,
             "limits": limits.model_dump(mode="json"),
         }
         return (
             f"Prompt Version: {PROMPT_VERSION_GENERATE}\n"
+            "CRITICAL CAUSAL RULES:\n"
+            "1. Assign a 'role' to every citation: 'cause', 'effect', 'correlation', 'contradiction', or 'context'.\n"
+            "2. Do NOT cite logs or metrics as direct 'cause' for configuration regressions or deployment failures (use 'effect' or 'correlation').\n"
+            "3. If claiming a configuration regression or deployment failure, cite direct change/deployment evidence.\n"
+            "4. Always include at least one alternative explanation (e.g. external dependency or infrastructure).\n\n"
             f"Generate hypotheses with supporting and contradicting evidence:\n"
             f"{json.dumps(payload, indent=2)}"
         )
@@ -707,12 +757,18 @@ class LLMReasoningProvider:
         previous_hypotheses: HypothesisSet,
         new_context: IncidentContextSnapshot,
     ) -> str:
+        new_context_dump = new_context.model_dump(mode="json")
+        new_context_dump["incident"] = self._sanitize_incident_for_prompt(new_context.incident)
         payload = {
             "previous_hypotheses": previous_hypotheses.model_dump(mode="json"),
-            "new_context": new_context.model_dump(mode="json"),
+            "new_context": new_context_dump,
         }
         return (
             f"Prompt Version: {PROMPT_VERSION_REVISE}\n"
+            "CRITICAL CAUSAL RULES:\n"
+            "1. Assign a 'role' to every citation: 'cause', 'effect', 'correlation', 'contradiction', or 'context'.\n"
+            "2. Logs and metrics cannot independently prove a deployment or configuration root cause (role should be 'effect' or 'correlation').\n"
+            "3. Actively update supporting and contradicting evidence for each hypothesis based on new findings.\n\n"
             f"Revise existing hypotheses based on new evidence:\n"
             f"{json.dumps(payload, indent=2)}"
         )

@@ -1,8 +1,13 @@
 {
   "scenario_id": "dependency_incompatibility",
-  "title": "Dependency incompatibility causing a crash",
+  "title": "[P2] Service Startup Failure on auth-service after build",
   "service": "auth-service",
   "detected_at": "2026-09-12T16:00:00Z",
+  "ground_truth": {
+    "expected_root_cause": "Dependency incompatibility causing a crash",
+    "expected_category": "dependency_incompatibility",
+    "expected_causal_record": "commit-dep-01"
+  },
   "sources": {
     "logs": [
       {

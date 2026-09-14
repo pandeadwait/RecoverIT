@@ -16,7 +16,14 @@ from typing import Any, Protocol
 
 from pydantic import Field
 
-from contracts.common import ContractModel, Reliability
+from contracts.common import (
+    ContractModel,
+    EvidenceRole,
+    EvidenceType,
+    Reliability,
+    RootCauseCategory,
+    SourceType,
+)
 from contracts.errors.schemas import (
     CITATION_INVALID,
     CROSS_INCIDENT_REFERENCE,
@@ -24,6 +31,20 @@ from contracts.errors.schemas import (
 )
 from contracts.evidence.schemas import EvidenceQuality, IncidentContextSnapshot
 from contracts.hypothesis.schemas import EvidenceCitation, Hypothesis
+
+CHANGE_RELATED_CATEGORIES = frozenset({
+    RootCauseCategory.CONFIGURATION_REGRESSION,
+    RootCauseCategory.DEPLOYMENT_FAILURE,
+    RootCauseCategory.CODE_DEFECT,
+})
+
+SYMPTOM_TYPES = frozenset({
+    EvidenceType.ERROR_EVENT,
+    EvidenceType.WARNING_EVENT,
+    EvidenceType.METRIC_ANOMALY,
+    EvidenceType.LOG_EVENT,
+    EvidenceType.METRIC_OBSERVATION,
+})
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +145,7 @@ class CitationValidator:
                 context_evidence_map=context_evidence_map,
                 citation_type="supporting",
                 errors=errors,
+                warnings=warnings,
                 low_rel_ids=low_rel_ids,
                 trunc_ids=trunc_ids,
             )
@@ -139,6 +161,7 @@ class CitationValidator:
                 context_evidence_map=context_evidence_map,
                 citation_type="contradicting",
                 errors=errors,
+                warnings=warnings,
                 low_rel_ids=low_rel_ids,
                 trunc_ids=trunc_ids,
             )
@@ -173,6 +196,67 @@ class CitationValidator:
                     )
                 )
 
+        # 5. Check category-specific direct causal evidence requirements for supporting citations
+        cited_records = [
+            context_evidence_map[c.evidence_id]
+            for c in hypothesis.supporting_evidence
+            if c.evidence_id in context_evidence_map
+        ]
+        cat_val = str(getattr(hypothesis.root_cause_category, "value", hypothesis.root_cause_category))
+        if hypothesis.root_cause_category == RootCauseCategory.CONFIGURATION_REGRESSION:
+            has_config_or_code = any(
+                getattr(r, "source_type", None) in (SourceType.CONFIGURATION, SourceType.CHANGES)
+                or getattr(r, "evidence_type", None) in (EvidenceType.CONFIGURATION_CHANGE, EvidenceType.CODE_CHANGE)
+                for r in cited_records
+            )
+            if not has_config_or_code:
+                warnings.append(
+                    StructuredError(
+                        code=CITATION_INVALID,
+                        message=(
+                            f"Configuration regression hypothesis '{hypothesis.hypothesis_id}' "
+                            f"does not cite configuration or code-change evidence; "
+                            f"claim remains an assumption without direct causal proof."
+                        ),
+                        retryable=False,
+                        source="reasoning.hypotheses.citation_validator",
+                        details={
+                            "hypothesis_id": hypothesis.hypothesis_id,
+                            "root_cause_category": cat_val,
+                        },
+                    )
+                )
+                assumptions.append(
+                    f"Hypothesis '{hypothesis.hypothesis_id}' lacks direct configuration/change evidence."
+                )
+
+        elif hypothesis.root_cause_category == RootCauseCategory.DEPLOYMENT_FAILURE:
+            has_deployment = any(
+                getattr(r, "source_type", None) == SourceType.DEPLOYMENTS
+                or getattr(r, "evidence_type", None) == EvidenceType.DEPLOYMENT_EVENT
+                for r in cited_records
+            )
+            if not has_deployment:
+                warnings.append(
+                    StructuredError(
+                        code=CITATION_INVALID,
+                        message=(
+                            f"Deployment failure hypothesis '{hypothesis.hypothesis_id}' "
+                            f"does not cite deployment evidence; "
+                            f"claim remains an assumption without direct causal proof."
+                        ),
+                        retryable=False,
+                        source="reasoning.hypotheses.citation_validator",
+                        details={
+                            "hypothesis_id": hypothesis.hypothesis_id,
+                            "root_cause_category": cat_val,
+                        },
+                    )
+                )
+                assumptions.append(
+                    f"Hypothesis '{hypothesis.hypothesis_id}' lacks direct deployment evidence."
+                )
+
         is_valid = len(errors) == 0
         return CitationValidationReport(
             is_valid=is_valid,
@@ -191,6 +275,7 @@ class CitationValidator:
         context_evidence_map: dict[str, Any],
         citation_type: str,
         errors: list[StructuredError],
+        warnings: list[StructuredError],
         low_rel_ids: list[str],
         trunc_ids: list[str],
     ) -> None:
@@ -274,6 +359,34 @@ class CitationValidator:
                 low_rel_ids.append(cit.evidence_id)
             if getattr(quality, "truncated_source", False):
                 trunc_ids.append(cit.evidence_id)
+
+        # E. Causal role validity:
+        # Logs and metrics cannot independently prove a change root cause when cited as 'cause'.
+        cit_role = getattr(cit, "role", EvidenceRole.CORRELATION)
+        if cit_role == EvidenceRole.CAUSE:
+            rec_source = getattr(record, "source_type", None)
+            rec_type = getattr(record, "evidence_type", None)
+            is_symptom_source = rec_source in (SourceType.LOGS, SourceType.METRICS) or rec_type in SYMPTOM_TYPES
+            if is_symptom_source and hypothesis.root_cause_category in CHANGE_RELATED_CATEGORIES:
+                cat_val = str(getattr(hypothesis.root_cause_category, "value", hypothesis.root_cause_category))
+                warnings.append(
+                    StructuredError(
+                        code=CITATION_INVALID,
+                        message=(
+                            f"Evidence '{cit.evidence_id}' from source '{rec_source}' is cited as direct 'cause', "
+                            f"but logs/metrics can only demonstrate impact or correlation, "
+                            f"not independently prove a {cat_val}."
+                        ),
+                        retryable=False,
+                        source="reasoning.hypotheses.citation_validator",
+                        details={
+                            "hypothesis_id": hypothesis.hypothesis_id,
+                            "evidence_id": cit.evidence_id,
+                            "source_type": str(rec_source),
+                            "role": str(cit_role),
+                        },
+                    )
+                )
 
     @staticmethod
     def _is_cross_incident(evidence_id: str, current_incident_id: str) -> bool:

@@ -17,6 +17,7 @@ from contracts.common import HypothesisStatus
 from contracts.evidence.schemas import IncidentContextSnapshot
 from contracts.hypothesis.schemas import EvidenceCitation, Hypothesis, HypothesisSet
 from reasoning.hypotheses.citation_validator import CitationValidator
+from reasoning.hypotheses.deduplicator import HypothesisDeduplicator
 from reasoning.provider.interface import ReasoningProvider
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,7 @@ class HypothesisReviser:
     - Calls ReasoningProvider.revise_hypotheses().
     - Updates revision numbers monotonically (at least prev.revision + 1).
     - Supports status transitions: active, weakened, rejected.
+    - Deduplicates semantically equivalent hypotheses while preserving distinct ones.
     - Preserves all rejected hypotheses (never drops them).
     - Preserves previous hypotheses omitted by the provider.
     - Re-validates citations against the latest IncidentContextSnapshot.
@@ -39,9 +41,11 @@ class HypothesisReviser:
         self,
         provider: ReasoningProvider,
         citation_validator: CitationValidator | None = None,
+        deduplicator: HypothesisDeduplicator | None = None,
     ) -> None:
         self._provider = provider
         self._citation_validator = citation_validator or CitationValidator()
+        self._deduplicator = deduplicator or HypothesisDeduplicator()
 
     async def revise(
         self,
@@ -148,8 +152,11 @@ class HypothesisReviser:
                 validated_hypotheses.append(preserved)
                 processed_ids.add(prev_id)
 
+        # Deduplicate semantically equivalent hypotheses
+        deduplicated_hypotheses = self._deduplicator.deduplicate(validated_hypotheses)
+
         return HypothesisSet(
             incident_id=previous_hypotheses.incident_id,
-            hypotheses=validated_hypotheses,
+            hypotheses=deduplicated_hypotheses,
             generated_at=datetime.now(timezone.utc),
         )

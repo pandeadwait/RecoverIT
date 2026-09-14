@@ -1,8 +1,13 @@
 {
   "scenario_id": "memory_exhaustion",
-  "title": "Memory exhaustion and container restarts",
+  "title": "[P1] Worker Pod CrashLoopBackOff (Exit Code 137) on order-api",
   "service": "order-api",
   "detected_at": "2026-09-12T14:45:00Z",
+  "ground_truth": {
+    "expected_root_cause": "Memory exhaustion and container restarts",
+    "expected_category": "resource_exhaustion",
+    "expected_causal_record": "commit-mem-01"
+  },
   "sources": {
     "logs": [
       {
