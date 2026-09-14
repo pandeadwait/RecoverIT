@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import logging
 from pathlib import Path
 import time
-from typing import Any
+from typing import Any, Callable
 import uuid
 
 from collectors.changes.git_adapter import LocalGitChangeAdapter
@@ -168,6 +168,7 @@ class InvestigationRunner:
         mode: str = "auto",
         provider: str = "auto",
         llm_model: str | None = None,
+        progress_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> InvestigationResult:
         """Run an investigation against one of the pre-packaged scenario families."""
         scenarios = list_available_scenarios()
@@ -201,6 +202,7 @@ class InvestigationRunner:
             provider=provider,
             llm_model=llm_model,
             start_time=start_time,
+            progress_callback=progress_callback,
         )
 
     async def run_target(
@@ -213,6 +215,7 @@ class InvestigationRunner:
         provider: str = "auto",
         llm_model: str | None = None,
         baseline_scenario: str = "bad_db_config",
+        progress_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> InvestigationResult:
         """Run an investigation against a real local Git repository and log file on disk."""
         start_time = time.monotonic()
@@ -252,6 +255,7 @@ class InvestigationRunner:
             provider=provider,
             llm_model=llm_model,
             start_time=start_time,
+            progress_callback=progress_callback,
         )
 
     async def _execute_investigation(
@@ -263,6 +267,7 @@ class InvestigationRunner:
         provider: str,
         llm_model: str | None,
         start_time: float,
+        progress_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> InvestigationResult:
         # 1. Discover capabilities
         p1_seed = Person1IncidentSeed.model_validate(seed.model_dump())
@@ -307,6 +312,7 @@ class InvestigationRunner:
             collection_service=col_svc,
             context_builder=ctx_bld,
             stopping_evaluator=StoppingRuleEvaluator(min_supporting_sources_for_adequate=1),
+            progress_callback=progress_callback,
         )
 
         effective_budget = InvestigationBudget(

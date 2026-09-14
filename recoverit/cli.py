@@ -8,13 +8,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import os
 from pathlib import Path
 import sys
 
 from rich.console import Console
+from rich.padding import Padding
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 from rich.text import Text
 
@@ -30,25 +29,96 @@ if sys.platform == "win32":
 console = Console(force_terminal=True, legacy_windows=False)
 
 BANNER = """
-[bold cyan]==============================================================[/bold cyan]
-[bold cyan]  RecoverIT  -  Autonomous CI/CD Incident Triager & Self-Healer [/bold cyan]
-[dim]  v0.1.0 • Multi-Source AI Root-Cause Investigation Platform [/dim]
-[bold cyan]==============================================================[/bold cyan]
+[color(109)]──────────────────────────────────────────────────────────────[/color(109)]
+[bold color(109)]  RecoverIT  ·  Autonomous CI/CD Incident Investigator[/bold color(109)]
+[grey50]  v0.1.0  ·  Evidence-led, multi-source root-cause analysis[/grey50]
+[color(109)]──────────────────────────────────────────────────────────────[/color(109)]
 """
+
+TRACE_STYLES = {
+    "status": ("STATUS", "color(109)"),
+    "assessment": ("ASSESSMENT", "color(139)"),
+    "reasoning": ("RATIONALE", "color(139)"),
+    "action": ("TOOL CALL", "color(110)"),
+    "observation": ("TOOL RESULT", "color(108)"),
+    "decision": ("DECISION", "color(179)"),
+    "warning": ("WARNING", "color(167)"),
+}
+
+
+class CLITraceRenderer:
+    """Render genuine orchestration events as a compact terminal activity trace."""
+
+    def __init__(self, target_console: Console = console) -> None:
+        self.console = target_console
+        self.event_count = 0
+
+    def __call__(self, event: dict[str, object]) -> None:
+        self.event_count += 1
+        kind = str(event.get("kind", "status"))
+        label, style = TRACE_STYLES.get(kind, TRACE_STYLES["status"])
+        title = str(event.get("title", "Investigation activity"))
+        detail = str(event.get("detail", ""))
+        output = event.get("output")
+        metadata = event.get("metadata") or {}
+        round_number = metadata.get("round") if isinstance(metadata, dict) else None
+        round_label = f" · round {round_number}" if isinstance(round_number, int) and round_number > 0 else ""
+
+        heading = Text()
+        heading.append("● ", style=style)
+        heading.append(title, style="bold grey82")
+        heading.append(f"  {label}{round_label}", style=f"bold {style}")
+        self.console.print(heading)
+
+        if detail:
+            self.console.print(Padding(Text(detail, style="grey62"), (0, 0, 0, 3)))
+
+        if output:
+            output_title = {
+                "assessment": "assessment output",
+                "action": "tool input",
+                "observation": "received output",
+                "decision": "decision output",
+                "warning": "received output",
+            }.get(kind, "agent context")
+            self.console.print(
+                Padding(
+                    Panel(
+                        Text(str(output), style="grey74"),
+                        title=output_title,
+                        title_align="left",
+                        border_style=style,
+                        padding=(0, 1),
+                    ),
+                    (0, 0, 1, 3),
+                )
+            )
 
 
 def render_banner() -> None:
     console.print(BANNER)
 
 
+def render_trace_header() -> None:
+    console.print(
+        Panel(
+            "[grey70]Live events below come from the real investigation loop. "
+            "Rationale is a concise explanation of structured decisions; source previews are "
+            "sanitized observations returned by tools.[/grey70]",
+            title="[bold color(109)]Agent investigation trace[/bold color(109)]",
+            border_style="color(109)",
+        )
+    )
+
+
 def list_command(args: argparse.Namespace) -> None:
     """List all available pre-packaged scenario families."""
     render_banner()
-    table = Table(title="Available Incident Alert Triggers", header_style="bold magenta")
-    table.add_column("Scenario ID", style="cyan", no_wrap=True)
-    table.add_column("Target Service", style="green")
+    table = Table(title="Available Incident Alert Triggers", header_style="bold color(139)")
+    table.add_column("Scenario ID", style="color(109)", no_wrap=True)
+    table.add_column("Target Service", style="color(108)")
     table.add_column("Incoming Alert Symptom", style="white")
-    table.add_column("Trigger Severity", style="red")
+    table.add_column("Trigger Severity", style="color(167)")
 
     scenario_symptoms = {
         "bad_db_config": ("[P1] HTTP 500 Error Spike (>35% errors)", "CRITICAL"),
@@ -64,39 +134,39 @@ def list_command(args: argparse.Namespace) -> None:
         table.add_row(name, data.get("service", "unknown"), symptom, severity)
 
     console.print(table)
-    console.print("\n[dim]Investigate any alert using:[/dim] [bold cyan]python -m recoverit.cli run --scenario <id>[/bold cyan]\n")
+    console.print("\n[dim]Investigate any alert using:[/dim] [bold color(109)]python -m recoverit.cli run --scenario <id>[/bold color(109)]\n")
 
 
 def display_results(res: InvestigationResult, report_path: str | None = None) -> None:
     """Pretty-print investigation outcome using Rich components."""
     # Summary panel
-    status_style = "bold green" if res.status == "completed" else "bold yellow"
+    status_style = "bold color(108)" if res.status == "completed" else "bold color(179)"
     summary_text = Text()
     summary_text.append(f"Incident ID: ", style="bold")
-    summary_text.append(f"{res.incident_id}\n", style="cyan")
+    summary_text.append(f"{res.incident_id}\n", style="color(109)")
     summary_text.append(f"Target Service: ", style="bold")
     summary_text.append(f"{res.service}\n", style="white")
     summary_text.append(f"Status: ", style="bold")
     summary_text.append(f"{res.status.upper()}\n", style=status_style)
     if res.stop_reason:
         summary_text.append("Stop Reason: ", style="bold")
-        summary_text.append(f"{res.stop_reason}\n", style="yellow")
+        summary_text.append(f"{res.stop_reason}\n", style="color(179)")
     summary_text.append(f"Reasoning Provider: ", style="bold")
-    summary_text.append(f"{res.provider_used}\n", style="magenta")
+    summary_text.append(f"{res.provider_used}\n", style="color(139)")
     summary_text.append(f"Analysis Duration: ", style="bold")
     summary_text.append(f"{res.execution_time_seconds:.2f} seconds\n", style="white")
     summary_text.append(f"Alert Summary: ", style="bold")
     summary_text.append(f"{res.summary}", style="italic")
 
-    console.print(Panel(summary_text, title="[bold]Incident Investigation Overview[/bold]", border_style="cyan"))
+    console.print(Panel(summary_text, title="[bold]Incident Investigation Overview[/bold]", border_style="color(109)"))
 
     # Reconstructed Timeline Table
     if res.timeline_events:
-        t_table = Table(title="Reconstructed Incident Chronology", header_style="bold blue")
-        t_table.add_column("Time (UTC)", style="cyan", no_wrap=True)
-        t_table.add_column("Category", style="yellow")
+        t_table = Table(title="Reconstructed Incident Chronology", header_style="bold color(110)")
+        t_table.add_column("Time (UTC)", style="color(109)", no_wrap=True)
+        t_table.add_column("Category", style="color(179)")
         t_table.add_column("Observation / Event", style="white")
-        t_table.add_column("Service", style="green")
+        t_table.add_column("Service", style="color(108)")
 
         for ev in res.timeline_events:
             ts = ev.get("event_time") or "Time unknown"
@@ -113,15 +183,15 @@ def display_results(res: InvestigationResult, report_path: str | None = None) ->
             console.print(
                 Panel(
                     f"[dim]Commit SHA: {cid}[/dim]\n\n{preview}",
-                    title="[bold red]Associated Code / Config Diff[/bold red]",
-                    border_style="red",
+                    title="[bold color(167)]Associated Code / Config Diff[/bold color(167)]",
+                    border_style="color(167)",
                 )
             )
 
     # Ranked Hypotheses
     console.print("\n[bold]🎯 Ranked Root-Cause Hypotheses[/bold]")
     if not res.ranked_hypotheses:
-        console.print("[yellow]No root-cause hypotheses met confidence criteria.[/yellow]")
+        console.print("[color(179)]No root-cause hypotheses met confidence criteria.[/color(179)]")
     else:
         for h in res.ranked_hypotheses:
             rank = h["rank"]
@@ -131,32 +201,32 @@ def display_results(res: InvestigationResult, report_path: str | None = None) ->
             comp = h["affected_component"]
             stmt = h["statement"]
 
-            conf_style = "green" if conf == "HIGH" else ("yellow" if conf == "MEDIUM" else "red")
+            conf_style = "color(108)" if conf == "HIGH" else ("color(179)" if conf == "MEDIUM" else "color(167)")
             card_lines = [
                 f"[bold white]{stmt}[/bold white]",
-                f"[dim]Category:[/dim] [yellow]{cat}[/yellow] | [dim]Component:[/dim] [cyan]{comp}[/cyan] | [dim]Score:[/dim] [bold]{score:.1f}/100[/bold] ([{conf_style}]{conf}[/{conf_style}])",
+                f"[dim]Category:[/dim] [color(179)]{cat}[/color(179)] | [dim]Component:[/dim] [color(109)]{comp}[/color(109)] | [dim]Score:[/dim] [bold]{score:.1f}/100[/bold] ([{conf_style}]{conf}[/{conf_style}])",
             ]
 
             citations = h.get("supporting_evidence", [])
             if citations:
-                card_lines.append("\n[bold green]Corroborating Citations:[/bold green]")
+                card_lines.append("\n[bold color(108)]Corroborating Citations:[/bold color(108)]")
                 for c in citations:
-                    card_lines.append(f"  - [cyan]{c['evidence_id']}[/cyan]: {c.get('reason', '')}")
+                    card_lines.append(f"  - [color(109)]{c['evidence_id']}[/color(109)]: {c.get('reason', '')}")
 
             contradictions = h.get("contradicting_evidence", [])
             if contradictions:
-                card_lines.append("\n[bold red]Contradicting Evidence:[/bold red]")
+                card_lines.append("\n[bold color(167)]Contradicting Evidence:[/bold color(167)]")
                 for c in contradictions:
-                    card_lines.append(f"  - [cyan]{c['evidence_id']}[/cyan]: {c.get('reason', '')}")
+                    card_lines.append(f"  - [color(109)]{c['evidence_id']}[/color(109)]: {c.get('reason', '')}")
 
-            border_color = "green" if rank == 1 else "blue"
+            border_color = "color(108)" if rank == 1 else "color(110)"
             console.print(Panel("\n".join(card_lines), title=f"[bold]Rank #{rank} — {conf} Confidence[/bold]", border_style=border_color))
 
     # Save Markdown report if requested
     if report_path:
         out_file = Path(report_path)
         out_file.write_text(res.to_markdown_report(), encoding="utf-8")
-        console.print(f"\n[bold green][OK] Post-mortem report saved to:[/bold green] {out_file.resolve()}")
+        console.print(f"\n[bold color(108)][OK] Post-mortem report saved to:[/bold color(108)] {out_file.resolve()}")
 
 
 async def run_scenario_flow(
@@ -168,35 +238,22 @@ async def run_scenario_flow(
 ) -> None:
     runner = InvestigationRunner()
     render_banner()
-
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[bold cyan]{task.description}"),
-        console=console,
-    ) as progress:
-        task = progress.add_task(f"Initializing investigation for scenario: [bold]{scenario}[/bold]...", total=None)
-        await asyncio.sleep(0.3)
-
-        progress.update(task, description="Assessing missing information gaps across 6 observability sources...")
-        await asyncio.sleep(0.3)
-
-        progress.update(task, description="Planning queries & executing collection...")
-        res = await runner.run_scenario(
-            scenario_name=scenario,
-            mode=mode,
-            provider=provider,
-            llm_model=model,
-        )
-
-        progress.update(task, description="Building normalized timeline & ranking root-cause hypotheses...")
-        await asyncio.sleep(0.2)
+    render_trace_header()
+    trace = CLITraceRenderer()
+    res = await runner.run_scenario(
+        scenario_name=scenario,
+        mode=mode,
+        provider=provider,
+        llm_model=model,
+        progress_callback=trace,
+    )
 
     if res.status == "completed":
-        console.print("\n[bold green]Investigation completed successfully.[/bold green]\n")
+        console.print("\n[bold color(108)]Investigation completed successfully.[/bold color(108)]\n")
     else:
         console.print(
-            f"\n[bold yellow]Investigation ended {res.status}: "
-            f"{res.stop_reason or 'no stop reason provided'}.[/bold yellow]\n"
+            f"\n[bold color(179)]Investigation ended {res.status}: "
+            f"{res.stop_reason or 'no stop reason provided'}.[/bold color(179)]\n"
         )
     display_results(res, report_path=report)
 
@@ -216,41 +273,27 @@ async def scan_repo_flow(
 
     repo_path = Path(repo).resolve()
     if not repo_path.exists():
-        console.print(f"[bold red]Error:[/bold red] Repository path '{repo}' does not exist.")
+        console.print(f"[bold color(167)]Error:[/bold color(167)] Repository path '{repo}' does not exist.")
         sys.exit(1)
-
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[bold cyan]{task.description}"),
-        console=console,
-    ) as progress:
-        task = progress.add_task(f"Connecting to Git repository at: [bold]{repo_path}[/bold]...", total=None)
-        await asyncio.sleep(0.3)
-
-        if logs:
-            progress.update(task, description=f"Scanning application logs from [bold]{logs}[/bold]...")
-            await asyncio.sleep(0.3)
-
-        progress.update(task, description="Reconstructing commit diffs and evaluating incident timeline...")
-        res = await runner.run_target(
-            repo_path=repo_path,
-            log_path=logs,
-            service_name=service,
-            summary=summary,
-            mode=mode,
-            provider=provider,
-            llm_model=model,
-        )
-
-        progress.update(task, description="Evaluating root-cause hypotheses and citations...")
-        await asyncio.sleep(0.2)
+    render_trace_header()
+    trace = CLITraceRenderer()
+    res = await runner.run_target(
+        repo_path=repo_path,
+        log_path=logs,
+        service_name=service,
+        summary=summary,
+        mode=mode,
+        provider=provider,
+        llm_model=model,
+        progress_callback=trace,
+    )
 
     if res.status == "completed":
-        console.print("\n[bold green]Repository triage completed successfully.[/bold green]\n")
+        console.print("\n[bold color(108)]Repository triage completed successfully.[/bold color(108)]\n")
     else:
         console.print(
-            f"\n[bold yellow]Repository triage ended {res.status}: "
-            f"{res.stop_reason or 'no stop reason provided'}.[/bold yellow]\n"
+            f"\n[bold color(179)]Repository triage ended {res.status}: "
+            f"{res.stop_reason or 'no stop reason provided'}.[/bold color(179)]\n"
         )
     display_results(res, report_path=report)
 

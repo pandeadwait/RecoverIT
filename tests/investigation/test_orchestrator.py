@@ -183,6 +183,7 @@ async def test_full_loop_completes_successfully(
     collection_service = InMemoryCollectionService()
     context_builder = InMemoryContextBuilder(synthetic_evidence=sample_context.evidence)
     checkpoint_store = InMemoryCheckpointStore()
+    progress_events: list[dict[str, object]] = []
 
     orchestrator = InvestigationOrchestrator(
         provider=provider,
@@ -190,6 +191,7 @@ async def test_full_loop_completes_successfully(
         context_builder=context_builder,
         checkpoint_store=checkpoint_store,
         stopping_evaluator=StoppingRuleEvaluator(min_supporting_sources_for_adequate=1),
+        progress_callback=progress_events.append,
     )
 
     budget = InvestigationBudget(max_rounds=2, max_queries=5, max_reasoning_calls=10)
@@ -231,6 +233,17 @@ async def test_full_loop_completes_successfully(
     assert any("post_call:MissingInformationAssessor.assess" in lbl for lbl in labels)
     assert any("pre_call:CollectionService.execute" in lbl for lbl in labels)
     assert any("post_call:CollectionService.execute" in lbl for lbl in labels)
+
+    # CLI-facing trace assertions: real rationale, tool calls, and outputs are emitted.
+    kinds = {event["kind"] for event in progress_events}
+    assert {"assessment", "reasoning", "action", "observation", "decision"} <= kinds
+    tool_results = [event for event in progress_events if event["kind"] == "observation"]
+    assert any(event.get("output") for event in tool_results)
+    assert any(
+        isinstance(event.get("metadata"), dict)
+        and event["metadata"].get("record_count", 0) > 0
+        for event in tool_results
+    )
 
 
 @pytest.mark.asyncio

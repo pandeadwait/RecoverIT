@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Callable, Protocol, runtime_checkable
 
 from contracts.collection.schemas import (
     RawEvidenceBatch,
@@ -423,6 +423,7 @@ class InvestigationOrchestrator:
         ranking_engine: RankingEngine | None = None,
         checkpoint_store: CheckpointStore | None = None,
         stopping_evaluator: StoppingRuleEvaluator | None = None,
+        progress_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> None:
         self._provider = provider
         self._collection_service = collection_service
@@ -442,6 +443,7 @@ class InvestigationOrchestrator:
         self._ranking_engine = ranking_engine or RankingEngine()
         self._checkpoint_store = checkpoint_store
         self._stopping_evaluator = stopping_evaluator or StoppingRuleEvaluator()
+        self._progress_callback = progress_callback
 
         # State tracking
         self._state_machine: InvestigationStateMachine | None = None
@@ -449,6 +451,79 @@ class InvestigationOrchestrator:
         self._current_hypotheses: HypothesisSet | None = None
         self._history_query_plans: list[EvidenceQueryPlan] = []
         self._history_batches: list[RawEvidenceBatch] = []
+
+    def _emit_progress(
+        self,
+        *,
+        kind: str,
+        stage: str,
+        title: str,
+        detail: str,
+        output: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Publish a concise, user-safe explanation of real orchestration activity."""
+        if self._progress_callback is None:
+            return
+        event = {
+            "kind": kind,
+            "stage": stage,
+            "title": title,
+            "detail": detail,
+            "output": output,
+            "metadata": metadata or {},
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        try:
+            self._progress_callback(event)
+        except Exception:  # pragma: no cover - observers must never break an investigation
+            logger.exception("Progress callback failed")
+
+    @staticmethod
+    def _enum_value(value: Any) -> str:
+        return str(value.value if hasattr(value, "value") else value)
+
+    @staticmethod
+    def _preview_record(source_type: SourceType, record: RawRecord) -> str:
+        """Return a short allow-listed preview without dumping an arbitrary payload."""
+        payload = record.payload
+
+        def clean(value: Any, limit: int = 180) -> str:
+            text = str(value).replace("\n", " ").strip()
+            return text if len(text) <= limit else f"{text[: limit - 1]}…"
+
+        if source_type == SourceType.LOGS:
+            level = clean(payload.get("level", "log")).upper()
+            return f"{level}: {clean(payload.get('message', record.content_type))}"
+        if source_type == SourceType.METRICS:
+            values = payload.get("values") or []
+            latest = values[-1] if isinstance(values, list) and values else payload.get("value", "n/a")
+            baseline = payload.get("baseline")
+            suffix = f"; baseline {clean(baseline)}" if baseline is not None else ""
+            return f"{clean(payload.get('metric_name', record.content_type))}: latest {clean(latest)}{suffix}"
+        if source_type == SourceType.CHANGES:
+            sha = clean(payload.get("commit_sha", record.source_record_id), 16)
+            files = payload.get("files_changed") or []
+            file_text = f"; files: {', '.join(map(str, files[:3]))}" if isinstance(files, list) and files else ""
+            return f"{sha} — {clean(payload.get('message', 'code change'))}{file_text}"
+        if source_type == SourceType.DEPLOYMENTS:
+            return (
+                f"{clean(payload.get('version', payload.get('deployment_id', record.source_record_id)))} "
+                f"reported {clean(payload.get('status', 'unknown'))}; commit "
+                f"{clean(payload.get('commit_sha', 'unknown'), 16)}"
+            )
+        if source_type == SourceType.PIPELINES:
+            passed = payload.get("tests_passed")
+            failed = payload.get("tests_failed")
+            tests = f"; tests {passed} passed / {failed} failed" if passed is not None or failed is not None else ""
+            return f"{clean(payload.get('pipeline', record.source_record_id))}: {clean(payload.get('status', 'unknown'))}{tests}"
+        if source_type == SourceType.CONFIGURATION:
+            config_key = clean(payload.get("key", "configuration"))
+            sensitive = any(token in config_key.lower() for token in ("password", "secret", "token", "api_key"))
+            old_value = "[redacted]" if sensitive else clean(payload.get("old_value", "unknown"))
+            new_value = "[redacted]" if sensitive else clean(payload.get("new_value", "unknown"))
+            return f"{config_key}: {old_value} → {new_value}"
+        return clean(record.content_type)
 
     @property
     def state_machine(self) -> InvestigationStateMachine | None:
@@ -519,6 +594,17 @@ class InvestigationOrchestrator:
             InvestigationState.ASSESSING_GAPS,
             reason="Starting initial gap assessment.",
         )
+        self._emit_progress(
+            kind="status",
+            stage="ingest",
+            title="Incident accepted",
+            detail="The agent created a bounded investigation and discovered the available evidence sources.",
+            output=(
+                f"{self._enum_value(incident.severity).upper()} alert for {incident.service}: "
+                f"{incident.summary}"
+            ),
+            metadata={"round": 0},
+        )
 
         while not self._state_machine.is_terminal:
             self._budget_tracker.record_round()
@@ -533,6 +619,16 @@ class InvestigationOrchestrator:
             self._state_machine.checkpoint_before_call(
                 "MissingInformationAssessor.assess",
                 payload={"round": round_num},
+            )
+            self._emit_progress(
+                kind="reasoning",
+                stage="assess",
+                title=f"Assessing evidence gaps · round {round_num}",
+                detail=(
+                    "The agent is comparing the alert and current evidence against the available "
+                    "sources to decide what must be verified next."
+                ),
+                metadata={"round": round_num},
             )
             try:
                 missing_info = await self._assessor.assess(
@@ -553,6 +649,21 @@ class InvestigationOrchestrator:
                 "MissingInformationAssessor.assess",
                 payload={"round": round_num},
             )
+            gap_lines = [
+                f"{self._enum_value(item.priority).upper()}: {item.question} — {item.reason}"
+                for item in missing_info.missing_information[:4]
+            ]
+            self._emit_progress(
+                kind="assessment",
+                stage="assess",
+                title="Gap assessment completed",
+                detail=(
+                    f"The model identified {len(missing_info.known_facts)} known fact(s) and "
+                    f"{len(missing_info.missing_information)} unresolved information gap(s)."
+                ),
+                output="\n".join(gap_lines) or "No additional evidence gaps were identified.",
+                metadata={"round": round_num},
+            )
 
             # Collect all historical queries to avoid duplicates
             all_historical_queries: list[EvidenceQueryPlanQuery] = [
@@ -560,6 +671,22 @@ class InvestigationOrchestrator:
             ]
 
             # --- Step B: Plan Allowed Queries ---
+            available_source_names = [
+                self._enum_value(source.source_type)
+                for source in source_capabilities.sources
+                if source.available
+            ]
+            self._emit_progress(
+                kind="reasoning",
+                stage="plan",
+                title=f"Planning evidence queries · round {round_num}",
+                detail=(
+                    "The model is choosing the smallest set of source queries that can resolve "
+                    "the highest-priority gaps, constrained by source capabilities and budget."
+                ),
+                output=f"Available sources: {', '.join(available_source_names)}",
+                metadata={"round": round_num},
+            )
             query_plan = await self._planner.plan(
                 missing_information=missing_info,
                 source_capabilities=source_capabilities,
@@ -569,6 +696,24 @@ class InvestigationOrchestrator:
                 history_queries=all_historical_queries,
             )
             self._history_query_plans.append(query_plan)
+
+            for query in query_plan.queries:
+                source_name = self._enum_value(query.source_type)
+                self._emit_progress(
+                    kind="reasoning",
+                    stage="plan",
+                    title=f"Selected {source_name} evidence",
+                    detail=(
+                        f"{query.question} This query was selected because its expected "
+                        f"information value is {self._enum_value(query.expected_information_value)}."
+                    ),
+                    output=f"Parameters: {query.parameters}",
+                    metadata={
+                        "round": round_num,
+                        "query_id": query.query_id,
+                        "source_type": source_name,
+                    },
+                )
 
             # Handle zero queries in plan
             if len(query_plan.queries) == 0:
@@ -587,6 +732,19 @@ class InvestigationOrchestrator:
                 "CollectionService.execute",
                 payload={"plan_id": query_plan.plan_id},
             )
+            for query in query_plan.queries:
+                self._emit_progress(
+                    kind="action",
+                    stage="collect",
+                    title=f"Querying {self._enum_value(query.source_type)}",
+                    detail=query.question,
+                    output=f"Tool request {query.query_id} sent with validated source parameters.",
+                    metadata={
+                        "round": round_num,
+                        "query_id": query.query_id,
+                        "source_type": self._enum_value(query.source_type),
+                    },
+                )
             raw_batch = await self._collection_service.execute(query_plan)
             self._budget_tracker.record_queries(len(query_plan.queries))
             self._history_batches.append(raw_batch)
@@ -594,6 +752,30 @@ class InvestigationOrchestrator:
                 "CollectionService.execute",
                 payload={"batch_id": raw_batch.batch_id},
             )
+            for result in raw_batch.results:
+                previews = [
+                    self._preview_record(result.source_type, record)
+                    for record in result.records[:3]
+                ]
+                if result.warnings:
+                    previews.extend(f"Warning: {warning}" for warning in result.warnings[:2])
+                self._emit_progress(
+                    kind="observation" if result.source_status == SourceStatus.OK else "warning",
+                    stage="collect",
+                    title=f"{self._enum_value(result.source_type).title()} returned {len(result.records)} record(s)",
+                    detail=(
+                        f"Tool call {result.query_id} completed with status "
+                        f"{self._enum_value(result.source_status)}. The preview below is the evidence returned, "
+                        "not model-generated text."
+                    ),
+                    output="\n".join(previews) or "No records returned.",
+                    metadata={
+                        "round": round_num,
+                        "query_id": result.query_id,
+                        "source_type": self._enum_value(result.source_type),
+                        "record_count": len(result.records),
+                    },
+                )
 
             # Check for catastrophic source unavailability
             all_unavailable = (
@@ -640,6 +822,20 @@ class InvestigationOrchestrator:
                 "ContextBuilder.build",
                 payload={"snapshot_id": self._current_context.snapshot_id},
             )
+            self._emit_progress(
+                kind="observation",
+                stage="context",
+                title="Evidence normalized into a timeline",
+                detail=(
+                    "The agent correlated timestamps and source records into one incident context "
+                    "before asking the model to form causal explanations."
+                ),
+                output=(
+                    f"Context now contains {len(self._current_context.evidence)} evidence item(s) "
+                    f"and {len(self._current_context.timeline)} timeline event(s)."
+                ),
+                metadata={"round": round_num},
+            )
 
             # --- Step E: Generate or Revise Hypotheses (Person 3) ---
             self._state_machine.transition_to(
@@ -649,6 +845,24 @@ class InvestigationOrchestrator:
                     if self._current_hypotheses is None
                     else f"Revising hypotheses in round {round_num}."
                 ),
+            )
+            self._emit_progress(
+                kind="reasoning",
+                stage="hypothesize",
+                title=(
+                    f"Testing causal hypotheses · round {round_num}"
+                    if self._current_hypotheses is None
+                    else f"Re-evaluating causal hypotheses · round {round_num}"
+                ),
+                detail=(
+                    "The model is comparing competing explanations against the normalized "
+                    "evidence and must cite the records that support or contradict each claim."
+                ),
+                output=(
+                    f"Evidence available: {len(self._current_context.evidence)} item(s) across "
+                    f"{len(self._current_context.source_coverage)} source coverage entries."
+                ),
+                metadata={"round": round_num},
             )
 
             if self._current_hypotheses is None:
@@ -697,6 +911,27 @@ class InvestigationOrchestrator:
                     payload={"count": len(self._current_hypotheses.hypotheses)},
                 )
 
+            hypothesis_lines = [
+                f"• {hypothesis.statement} ({len(hypothesis.supporting_evidence)} supporting, "
+                f"{len(hypothesis.contradicting_evidence)} contradicting citations)"
+                for hypothesis in self._current_hypotheses.hypotheses[:5]
+            ]
+            self._emit_progress(
+                kind="reasoning",
+                stage="hypothesize",
+                title=(
+                    "Generated evidence-backed hypotheses"
+                    if round_num == 1
+                    else "Revised hypotheses with new evidence"
+                ),
+                detail=(
+                    "The model proposed testable explanations, but only citations that exist in "
+                    "the normalized context are retained."
+                ),
+                output="\n".join(hypothesis_lines) or "No valid hypotheses were produced.",
+                metadata={"round": round_num},
+            )
+
             # --- Step F: Check Stopping Rules ---
             decision = self._stopping_evaluator.evaluate(
                 round_num=round_num,
@@ -706,6 +941,18 @@ class InvestigationOrchestrator:
                 query_plan=query_plan,
                 budget_tracker=self._budget_tracker,
                 max_rounds=max_rounds,
+            )
+            self._emit_progress(
+                kind="decision",
+                stage="rank",
+                title="Evaluated stopping rules",
+                detail=decision.reason,
+                output=(
+                    "Stop and rank the supported hypotheses."
+                    if decision.should_stop
+                    else f"Continue to investigation round {round_num + 1}."
+                ),
+                metadata={"round": round_num, "should_stop": decision.should_stop},
             )
 
             if decision.should_stop:
