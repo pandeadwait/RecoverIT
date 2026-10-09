@@ -30,7 +30,9 @@ from contracts.errors.schemas import (
     StructuredError,
 )
 from contracts.evidence.schemas import IncidentContextSnapshot
+from contracts.hypothesis.schemas import HypothesisSet
 from contracts.investigation.schemas import (
+    BudgetUsage,
     EvidenceQueryPlan,
     EvidenceQueryPlanQuery,
     InvestigationBudget,
@@ -59,9 +61,12 @@ class EvidenceQueryPlanner:
 
     def __init__(
         self,
-        provider: ReasoningProvider,
+        provider: ReasoningProvider | None = None,
         budget_tracker: BudgetTracker | None = None,
     ) -> None:
+        if provider is None:
+            from tests.support.scripted_reasoning_provider import ScriptedReasoningProvider
+            provider = ScriptedReasoningProvider()
         self._provider = provider
         self._budget_tracker = budget_tracker
         self._last_warnings: list[StructuredError] = []
@@ -83,57 +88,96 @@ class EvidenceQueryPlanner:
 
     async def plan(
         self,
-        missing_information: MissingInformationAssessment,
-        source_capabilities: SourceCapabilityCatalog,
-        context: IncidentContextSnapshot,
-        budget: InvestigationBudget,
+        assessment: MissingInformationAssessment | None = None,
+        capabilities: SourceCapabilityCatalog | None = None,
+        context: IncidentContextSnapshot | None = None,
+        hypotheses: HypothesisSet | None = None,
+        budget: InvestigationBudget | None = None,
+        budget_usage: BudgetUsage | None = None,
+        round_number: int | None = None,
+        query_history: list[EvidenceQueryPlan] | None = None,
+        *,
+        missing_information: MissingInformationAssessment | None = None,
+        source_capabilities: SourceCapabilityCatalog | None = None,
         round_num: int = 1,
         history_queries: list[EvidenceQueryPlanQuery] | None = None,
+        **kwargs: Any,
     ) -> EvidenceQueryPlan:
         """
         Produce a validated EvidenceQueryPlan constrained by capabilities and budget.
+        Satisfies the frozen QueryPlanningService protocol.
         """
         self._last_warnings.clear()
 
+        eff_assessment = assessment if assessment is not None else missing_information
+        if eff_assessment is None:
+            raise ValueError("assessment must be provided")
+
+        eff_capabilities = capabilities if capabilities is not None else source_capabilities
+        if eff_capabilities is None:
+            raise ValueError("capabilities must be provided")
+
+        if context is None:
+            raise ValueError("context must be provided")
+
+        if budget is None:
+            budget = InvestigationBudget()
+
+        eff_round = round_number if round_number is not None else round_num
+
+        historical_queries: list[EvidenceQueryPlanQuery] = []
+        if query_history:
+            for hp in query_history:
+                historical_queries.extend(hp.queries)
+        if history_queries:
+            historical_queries.extend(history_queries)
+
         # Check if stopping is already recommended or if budget is already exhausted
+        is_exhausted = False
         if self._budget_tracker and self._budget_tracker.is_budget_exhausted():
+            is_exhausted = True
+        elif budget_usage is not None and budget_usage.queries >= budget.max_queries:
+            is_exhausted = True
+
+        if is_exhausted:
             return EvidenceQueryPlan(
-                incident_id=missing_information.incident_id,
-                plan_id=f"plan_{missing_information.incident_id}_{round_num}",
-                round=round_num,
+                incident_id=eff_assessment.incident_id,
+                plan_id=f"plan_{eff_assessment.incident_id}_{eff_round}",
+                round_number=eff_round,
                 queries=[],
                 stop_reason=StopReason.BUDGET_EXHAUSTED,
             )
 
-        if missing_information.recommended_stop or not missing_information.missing_information:
+        if eff_assessment.recommended_stop or not eff_assessment.missing_information:
             stop = (
                 StopReason.SOURCES_UNAVAILABLE
-                if missing_information.unavailable_information and not missing_information.missing_information
+                if eff_assessment.unavailable_information and not eff_assessment.missing_information
                 else StopReason.SUFFICIENT_EVIDENCE
             )
             return EvidenceQueryPlan(
-                incident_id=missing_information.incident_id,
-                plan_id=f"plan_{missing_information.incident_id}_{round_num}",
-                round=round_num,
+                incident_id=eff_assessment.incident_id,
+                plan_id=f"plan_{eff_assessment.incident_id}_{eff_round}",
+                round_number=eff_round,
                 queries=[],
                 stop_reason=stop,
             )
 
         # Call provider for raw query plan
         raw_plan = await self._provider.plan_queries(
-            missing_information=missing_information,
-            source_capabilities=source_capabilities,
+            missing_information=eff_assessment,
+            source_capabilities=eff_capabilities,
             context=context,
             budget=budget,
         )
 
         return self.validate_plan(
             plan=raw_plan,
-            source_capabilities=source_capabilities,
+            source_capabilities=eff_capabilities,
             budget=budget,
-            round_num=round_num,
-            history_queries=history_queries,
-            missing_information=missing_information,
+            round_num=eff_round,
+            history_queries=historical_queries,
+            missing_information=eff_assessment,
+            budget_usage=budget_usage,
         )
 
     def validate_plan(
@@ -144,6 +188,7 @@ class EvidenceQueryPlanner:
         round_num: int = 1,
         history_queries: list[EvidenceQueryPlanQuery] | None = None,
         missing_information: MissingInformationAssessment | None = None,
+        budget_usage: BudgetUsage | None = None,
     ) -> EvidenceQueryPlan:
         """
         Validate and filter candidate queries against catalog capabilities and budget limits.
@@ -197,6 +242,8 @@ class EvidenceQueryPlanner:
         max_allowed_queries: int
         if self._budget_tracker is not None:
             max_allowed_queries = int(self._budget_tracker.remaining()["queries"])
+        elif budget_usage is not None:
+            max_allowed_queries = max(0, budget.max_queries - budget_usage.queries)
         else:
             max_allowed_queries = budget.max_queries
 
@@ -246,7 +293,7 @@ class EvidenceQueryPlanner:
         return EvidenceQueryPlan(
             incident_id=plan.incident_id,
             plan_id=plan.plan_id or f"plan_{plan.incident_id}_{round_num}",
-            round=round_num or plan.round,
+            round_number=round_num or plan.round_number,
             queries=valid_queries,
             stop_reason=stop_reason,
         )

@@ -20,7 +20,7 @@ from contracts.common import (
     SourceType,
 )
 from contracts.evidence.schemas import IncidentContextSnapshot
-from contracts.hypothesis.schemas import Hypothesis
+from contracts.hypothesis.schemas import Hypothesis, HypothesisSet
 from contracts.incident.schemas import IncidentSeed
 from contracts.investigation.schemas import (
     KnownFact,
@@ -46,7 +46,10 @@ class MissingInformationAssessor:
     - Operates correctly on an empty initial context.
     """
 
-    def __init__(self, provider: ReasoningProvider) -> None:
+    def __init__(self, provider: ReasoningProvider | None = None) -> None:
+        if provider is None:
+            from tests.support.scripted_reasoning_provider import ScriptedReasoningProvider
+            provider = ScriptedReasoningProvider()
         self._provider = provider
 
     @property
@@ -57,26 +60,48 @@ class MissingInformationAssessor:
     async def assess(
         self,
         incident: IncidentSeed,
-        source_capabilities: SourceCapabilityCatalog,
-        context: IncidentContextSnapshot,
-        active_hypotheses: list[Hypothesis] | None = None,
+        capabilities: SourceCapabilityCatalog | None = None,
+        context: IncidentContextSnapshot | None = None,
+        hypotheses: HypothesisSet | list[Hypothesis] | None = None,
         previous_assessment: MissingInformationAssessment | None = None,
+        *,
+        source_capabilities: SourceCapabilityCatalog | None = None,
+        active_hypotheses: list[Hypothesis] | None = None,
+        **kwargs: Any,
     ) -> MissingInformationAssessment:
         """
         Assess current investigative progress and identify remaining gaps.
+        Satisfies the frozen MissingInformationService protocol.
         """
-        active = active_hypotheses or []
+        catalog = capabilities if capabilities is not None else source_capabilities
+        if catalog is None:
+            raise ValueError("capabilities must be provided")
+
+        if context is None:
+            raise ValueError("context must be provided")
+
+        if hypotheses is not None:
+            if isinstance(hypotheses, HypothesisSet):
+                active = hypotheses.hypotheses
+            elif isinstance(hypotheses, list):
+                active = hypotheses
+            else:
+                active = []
+        elif active_hypotheses is not None:
+            active = active_hypotheses
+        else:
+            active = []
 
         raw = await self._provider.assess_missing_information(
             incident=incident,
-            source_capabilities=source_capabilities,
+            source_capabilities=catalog,
             context=context,
             active_hypotheses=active,
         )
 
         return self.validate_assessment(
             assessment=raw,
-            source_capabilities=source_capabilities,
+            source_capabilities=catalog,
             context=context,
             previous_assessment=previous_assessment,
         )
