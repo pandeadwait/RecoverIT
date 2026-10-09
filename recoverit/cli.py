@@ -22,7 +22,14 @@ from collectors.fixtures import (
     load_scenario_json,
     resolve_scenario_name,
 )
-from recoverit.runner import InvestigationResult, InvestigationRunner
+from contracts.errors.schemas import ProgressEvent
+from contracts.incident.schemas import IncidentSeed
+from contracts.investigation.schemas import InvestigationBudget
+from recoverit.runner import (
+    InvestigationResult,
+    InvestigationRunner,
+    LangGraphInvestigationRunner,
+)
 
 if sys.platform == "win32":
     try:
@@ -59,7 +66,11 @@ class CLITraceRenderer:
         self.event_count = 0
         self.trace_steps: list[dict[str, Any]] = []
 
-    def __call__(self, event: dict[str, object]) -> None:
+    def __call__(self, event: ProgressEvent | dict[str, object]) -> None:
+        """Render both typed LangGraph events and legacy dictionary events."""
+
+        if isinstance(event, ProgressEvent):
+            event = event.model_dump(mode="json")
         self.event_count += 1
         kind = str(event.get("kind", "status"))
 
@@ -481,6 +492,30 @@ async def run_scenario_flow(
         reveal_ground_truth=reveal_ground_truth,
         scenario_name=scenario,
     )
+
+
+async def run_live_investigation_flow(
+    runner: LangGraphInvestigationRunner,
+    incident: IncidentSeed,
+    budget: InvestigationBudget | None = None,
+    report: str | None = None,
+) -> InvestigationResult:
+    """Run one canonical incident through the graph-backed live runtime.
+
+    Runtime composition remains outside the CLI so source credentials, clients,
+    and benchmark fixtures can never be inferred from a command-line request.
+    """
+
+    render_banner()
+    render_trace_header()
+    trace = CLITraceRenderer()
+    result = await runner.run(
+        incident=incident,
+        budget=budget,
+        progress_callback=trace,
+    )
+    display_results(result, report_path=report)
+    return result
 
 
 async def run_benchmark_flow(

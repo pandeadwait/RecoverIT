@@ -36,6 +36,7 @@ from investigation.orchestration.orchestrator import (
 from reasoning.provider.clients import create_llm_client
 from reasoning.provider.fake_provider import FakeReasoningProvider
 from reasoning.provider.llm_provider import LLMReasoningProvider
+from recoverit.composition import ProgressCallback, RuntimeContainer
 
 logger = logging.getLogger(__name__)
 
@@ -506,4 +507,154 @@ class InvestigationRunner:
             completion_criteria=criteria_status,
             unresolved_criteria=unresolved_criteria,
             scenario_name=scenario_name,
+        )
+
+
+class LangGraphInvestigationRunner:
+    """Run a generic incident through the compiled LangGraph workflow.
+
+    This is intentionally separate from the legacy runner while parity work is
+    in progress.  It accepts an already-composed runtime and never imports
+    scenarios, fixtures, or preset reasoning providers.
+    """
+
+    def __init__(self, runtime: RuntimeContainer) -> None:
+        self._runtime = runtime
+
+    async def run(
+        self,
+        incident: Person3IncidentSeed,
+        budget: InvestigationBudget | None = None,
+        progress_callback: ProgressCallback | None = None,
+    ) -> InvestigationResult:
+        """Invoke the graph with the incident ID as the durable thread ID."""
+
+        start_time = time.monotonic()
+        capabilities = self._runtime.registry.capabilities(incident)
+        config = {"configurable": {"thread_id": incident.incident_id}}
+        graph_input = {
+            "incident": incident,
+            "source_capabilities": capabilities,
+            "budget": budget or InvestigationBudget(),
+        }
+        with self._runtime.progress_dispatcher.bind(progress_callback):
+            output = await self._runtime.graph.ainvoke(graph_input, config=config)
+        return self._to_result(
+            output=output,
+            incident=incident,
+            elapsed=time.monotonic() - start_time,
+        )
+
+    async def resume(
+        self,
+        incident_id: str,
+        progress_callback: ProgressCallback | None = None,
+    ) -> InvestigationResult:
+        """Resume an interrupted graph or read a completed checkpoint."""
+
+        config = {"configurable": {"thread_id": incident_id}}
+        snapshot = await self._runtime.graph.aget_state(config)
+        if not snapshot.values:
+            raise ValueError(f"No checkpoint exists for incident '{incident_id}'.")
+
+        with self._runtime.progress_dispatcher.bind(progress_callback):
+            if snapshot.values.get("ranked_result") is None:
+                output = await self._runtime.graph.ainvoke(None, config=config)
+            else:
+                output = snapshot.values
+        incident = output["context"].incident
+        seed = Person3IncidentSeed(
+            incident_id=output["ranked_result"].incident_id,
+            external_alert_id=incident_id,
+            service=incident.service,
+            environment=incident.environment,
+            severity=incident.severity,
+            detected_at=incident.detected_at,
+            received_at=output.get("started_at", output["context"].created_at),
+            summary=incident.summary,
+        )
+        started_at = output.get("started_at")
+        elapsed = (
+            max(0.0, (datetime.now(timezone.utc) - started_at).total_seconds())
+            if started_at is not None
+            else 0.0
+        )
+        return self._to_result(output=output, incident=seed, elapsed=elapsed)
+
+    @staticmethod
+    def _to_result(
+        *,
+        output: dict[str, Any],
+        incident: Person3IncidentSeed,
+        elapsed: float,
+    ) -> InvestigationResult:
+        ranked_set: RankedHypothesisSet = output["ranked_result"]
+        context = output["context"]
+
+        timeline_events = [
+            {
+                "event_id": event.timeline_event_id,
+                "event_time": event.event_time.isoformat() if event.event_time else None,
+                "category": str(event.category),
+                "title": event.title,
+                "service": event.service,
+                "evidence_ids": list(event.evidence_ids),
+            }
+            for event in context.timeline
+        ]
+        evidence_items = [
+            {
+                "evidence_id": evidence.evidence_id,
+                "source_type": str(evidence.source_type),
+                "evidence_type": str(evidence.evidence_type),
+                "event_time": (
+                    evidence.event_time.isoformat() if evidence.event_time else None
+                ),
+                "summary": evidence.summary,
+                "source_record_id": None,
+            }
+            for evidence in context.evidence
+        ]
+        ranked_hypotheses = [
+            {
+                "rank": hypothesis.rank,
+                "hypothesis_id": hypothesis.hypothesis_id,
+                "statement": hypothesis.statement,
+                "root_cause_category": str(hypothesis.root_cause_category),
+                "affected_component": hypothesis.affected_component,
+                "evidence_score": hypothesis.evidence_score,
+                "confidence_label": str(hypothesis.confidence_label),
+                "supporting_evidence": [
+                    {"evidence_id": citation.evidence_id, "reason": citation.reason}
+                    for citation in hypothesis.supporting_evidence
+                ],
+                "contradicting_evidence": [
+                    {"evidence_id": citation.evidence_id, "reason": citation.reason}
+                    for citation in hypothesis.contradicting_evidence
+                ],
+                "score_breakdown": (
+                    hypothesis.score_breakdown.model_dump()
+                    if hypothesis.score_breakdown
+                    else {}
+                ),
+            }
+            for hypothesis in ranked_set.hypotheses
+        ]
+        decision = output.get("stop_decision")
+        return InvestigationResult(
+            incident_id=incident.incident_id,
+            service=incident.service,
+            summary=incident.summary,
+            status=str(ranked_set.status),
+            stop_reason=(str(ranked_set.stop_reason) if ranked_set.stop_reason else None),
+            execution_time_seconds=elapsed,
+            ranked_hypotheses=ranked_hypotheses,
+            timeline_events=timeline_events,
+            evidence_items=evidence_items,
+            diff_excerpts={},
+            log_excerpts=[],
+            budget_usage=ranked_set.budget_usage.model_dump(mode="json"),
+            provider_used="runtime-configured",
+            completion_criteria=(decision.criteria_status if decision else {}),
+            unresolved_criteria=(decision.unresolved_criteria if decision else []),
         )

@@ -50,6 +50,8 @@ from investigation.graph import (
     route_after_evaluation,
     route_after_plan,
 )
+from recoverit.composition import RuntimeMode, RuntimeSettings, build_runtime
+from recoverit.runner import LangGraphInvestigationRunner
 
 
 NOW = datetime(2026, 10, 9, 12, 0, tzinfo=timezone.utc)
@@ -251,6 +253,14 @@ def invocation_input() -> dict[str, object]:
     }
 
 
+class StaticCapabilityRegistry:
+    """Registry double used to test runner-to-graph composition."""
+
+    def capabilities(self, incident):
+        catalog = invocation_input()["source_capabilities"]
+        return catalog.model_copy(update={"incident_id": incident.incident_id})
+
+
 def test_scripted_services_conform_to_frozen_protocols() -> None:
     deps = dependencies()
     assert isinstance(deps.collection_service, CollectionService)
@@ -340,3 +350,43 @@ async def test_checkpoint_state_uses_incident_id_as_thread_id() -> None:
     assert snapshot.values["incident"].incident_id == "inc-1"
     assert snapshot.values["workflow_state"] == InvestigationState.COMPLETED
     assert snapshot.values["ranked_result"].incident_id == "inc-1"
+
+
+@pytest.mark.asyncio
+async def test_graph_runner_invokes_runtime_with_incident_thread_id() -> None:
+    deps = dependencies()
+    runtime = build_runtime(
+        RuntimeSettings(mode=RuntimeMode.TEST),
+        registry=StaticCapabilityRegistry(),
+        dependencies=deps,
+    )
+    progress = []
+    runner = LangGraphInvestigationRunner(runtime)
+
+    result = await runner.run(
+        invocation_input()["incident"], progress_callback=progress.append
+    )
+    snapshot = runtime.graph.get_state(
+        {"configurable": {"thread_id": result.incident_id}}
+    )
+
+    assert result.status == InvestigationStatus.COMPLETED
+    assert snapshot.values["ranked_result"].incident_id == result.incident_id
+    assert [event.stage for event in progress][-1] == "rank_hypotheses"
+
+
+@pytest.mark.asyncio
+async def test_graph_runner_reads_a_completed_checkpoint_by_incident_id() -> None:
+    runtime = build_runtime(
+        RuntimeSettings(mode=RuntimeMode.TEST),
+        registry=StaticCapabilityRegistry(),
+        dependencies=dependencies(),
+    )
+    runner = LangGraphInvestigationRunner(runtime)
+
+    initial = await runner.run(invocation_input()["incident"])
+    resumed = await runner.resume(initial.incident_id)
+
+    assert resumed.incident_id == initial.incident_id
+    assert resumed.status == InvestigationStatus.COMPLETED
+    assert resumed.ranked_hypotheses == initial.ranked_hypotheses
