@@ -1,6 +1,11 @@
 """Incident context assembly, publication, coverage, and query services."""
 
-from evidence.context.builder import ContextBuildError, ContextSnapshotBuilder
+from evidence.context.builder import (
+    ContextBuildError,
+    ContextBuilder,
+    ContextSnapshotBuilder,
+    DefaultContextBuilder,
+)
 from evidence.context.coverage import SOURCE_TYPES, SourceCoverageCalculator
 from evidence.context.queries import (
     EvidenceContextQueryService,
@@ -13,9 +18,11 @@ from evidence.context.service import (
 
 __all__ = [
     "ContextBuildError",
+    "ContextBuilder",
     "ContextPublicationService",
     "ContextPublicationRepository",
     "ContextSnapshotBuilder",
+    "DefaultContextBuilder",
     "EvidenceContextQueryService",
     "IncidentContextReader",
     "SOURCE_TYPES",

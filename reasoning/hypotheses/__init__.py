@@ -14,11 +14,15 @@ from reasoning.hypotheses.generator import (
 from reasoning.hypotheses.reviser import (
     HypothesisReviser,
 )
+from reasoning.hypotheses.service import (
+    DefaultHypothesisService,
+)
 
 __all__ = [
     "CHANGE_RELATED_CATEGORIES",
     "CitationValidationReport",
     "CitationValidator",
+    "DefaultHypothesisService",
     "HypothesisDeduplicator",
     "HypothesisGenerator",
     "HypothesisReviser",

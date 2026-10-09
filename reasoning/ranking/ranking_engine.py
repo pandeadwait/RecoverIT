@@ -364,27 +364,38 @@ class RankingEngine:
 
     def rank(
         self,
-        hypothesis_set: HypothesisSet,
-        context: IncidentContextSnapshot,
+        hypotheses: HypothesisSet | None = None,
+        context: IncidentContextSnapshot | None = None,
         budget_usage: BudgetUsage | None = None,
-        remaining_uncertainty: list[str] | None = None,
-        ranking_id: str | None = None,
-        stop_reason: StopReason | None = None,
         status: InvestigationStatus | None = None,
+        stop_reason: StopReason | None = None,
+        remaining_uncertainty: list[str] | None = None,
+        *,
+        hypothesis_set: HypothesisSet | None = None,
+        ranking_id: str | None = None,
         created_at: datetime | None = None,
+        **kwargs: Any,
     ) -> RankedHypothesisSet:
         """
         Rank hypotheses deterministically against incident context.
+        Satisfies the frozen RankingService protocol.
 
         If no hypothesis has valid supporting evidence (or hypotheses set is empty),
         returns an inconclusive RankedHypothesisSet with stop_reason set.
         """
-        incident_id = hypothesis_set.incident_id or context.incident_id
+        eff_hypotheses = hypotheses if hypotheses is not None else hypothesis_set
+        if eff_hypotheses is None:
+            raise ValueError("hypotheses must be provided")
+
+        if context is None:
+            raise ValueError("context must be provided")
+
+        incident_id = eff_hypotheses.incident_id or context.incident_id
         effective_created_at = created_at if created_at is not None else context.created_at
         effective_budget_usage = budget_usage or BudgetUsage()
 
         if ranking_id is None:
-            content_key = f"{incident_id}_{context.snapshot_id}_{len(hypothesis_set.hypotheses)}"
+            content_key = f"{incident_id}_{context.snapshot_id}_{len(eff_hypotheses.hypotheses)}"
             short_hash = hashlib.sha256(content_key.encode()).hexdigest()[:8]
             ranking_id = f"rank_{short_hash}"
 
@@ -393,12 +404,12 @@ class RankingEngine:
         context_evidence_ids = {e.evidence_id for e in context.evidence}
         has_any_valid_support = any(
             any(c.evidence_id in context_evidence_ids for c in h.supporting_evidence)
-            for h in hypothesis_set.hypotheses
+            for h in eff_hypotheses.hypotheses
         )
 
         is_inconclusive = (
             status == InvestigationStatus.INCONCLUSIVE
-            or not hypothesis_set.hypotheses
+            or not eff_hypotheses.hypotheses
             or not has_any_valid_support
         )
 
@@ -427,7 +438,7 @@ class RankingEngine:
 
         # Score each hypothesis
         scored_items: list[tuple[float, str, Hypothesis, ScoreBreakdown, ConfidenceLabel]] = []
-        for h in hypothesis_set.hypotheses:
+        for h in eff_hypotheses.hypotheses:
             breakdown = self.calculate_breakdown(h, context)
             score = self.calculate_evidence_score(breakdown)
             confidence = self.derive_confidence_label(score, hypothesis=h, context=context)
