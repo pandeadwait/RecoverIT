@@ -43,23 +43,9 @@ class LocalGitChangeAdapter(ChangeSource):
         """Check whether the configured repo_path is a valid Git repository."""
         return (self.repo_path / ".git").exists() or (self.repo_path / "HEAD").exists()
 
-    def ensure_git_initialized(self) -> bool:
-        """Initialize and commit files if repo_path contains source code but no git repository."""
-        if self.is_git_repository():
-            return True
-        try:
-            subprocess.run(["git", "init"], cwd=str(self.repo_path), capture_output=True, check=True)
-            subprocess.run(["git", "config", "user.email", "ci-bot@recoverit.local"], cwd=str(self.repo_path), capture_output=True)
-            subprocess.run(["git", "config", "user.name", "RecoverIT CI Bot"], cwd=str(self.repo_path), capture_output=True)
-            subprocess.run(["git", "add", "."], cwd=str(self.repo_path), capture_output=True)
-            subprocess.run(["git", "commit", "-m", "Initial commit: service core logic and config"], cwd=str(self.repo_path), capture_output=True)
-            return self.is_git_repository()
-        except Exception:
-            return False
-
     def get_capability(self, incident: IncidentSeed | None = None) -> SourceCapability:
         """Return the capability descriptor for this local Git adapter."""
-        available = self.is_git_repository() or self.ensure_git_initialized()
+        available = self.is_git_repository()
         return SourceCapability(
             source_type=SourceType.CHANGES,
             available=available,
