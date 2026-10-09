@@ -212,7 +212,7 @@ class TestRawAlertValidation:
         err: StructuredError = exc_info.value.error
         assert err.code == "INVALID_ALERT_PAYLOAD"
         assert err.retryable is False
-        assert err.source == "alert_validation"
+        assert err.stage == "alert_validation"
         assert missing_field in str(err.details)
 
     def test_naive_datetime_rejected(self):

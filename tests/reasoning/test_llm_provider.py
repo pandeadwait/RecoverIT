@@ -161,6 +161,7 @@ def sample_catalog(sample_incident: IncidentSeed) -> SourceCapabilityCatalog:
         sources=[
             SourceCapability(
                 source_type=SourceType.LOGS,
+                adapter_name="test-logs",
                 available=True,
                 supported_query_fields=["service", "severity", "limit"],
                 maximum_window_seconds=3600,
@@ -168,6 +169,7 @@ def sample_catalog(sample_incident: IncidentSeed) -> SourceCapabilityCatalog:
             ),
             SourceCapability(
                 source_type=SourceType.DEPLOYMENTS,
+                adapter_name="test-deployments",
                 available=True,
                 supported_query_fields=["service", "limit"],
                 maximum_window_seconds=86400,
@@ -242,6 +244,7 @@ async def test_llm_plan_is_anchored_and_clamped_to_source_capability(
         sources=[
             SourceCapability(
                 source_type=SourceType.DEPLOYMENTS,
+                adapter_name="test-deployments",
                 available=True,
                 supported_query_fields=["service", "since", "until", "limit"],
                 maximum_window_seconds=604800,

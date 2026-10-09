@@ -164,11 +164,15 @@ class TestPerson1ToPerson3Contracts:
 
         assert consumed_catalog.schema_version == "1.0"
         assert consumed_catalog.incident_id == "inc_p3_discovery"
-        assert len(consumed_catalog.sources) == 6
+        assert len(consumed_catalog.sources) == 7
 
         # Person 3 checks which sources are available and their limits
         avail_map = {s.source_type: s for s in consumed_catalog.sources if s.available}
-        assert set(avail_map.keys()) == set(SourceType)
+        assert set(avail_map.keys()) == set(SourceType) - {SourceType.HEALTH}
+        assert next(
+            source for source in consumed_catalog.sources
+            if source.source_type == SourceType.HEALTH
+        ).available is False
         assert "limit" in avail_map[SourceType.LOGS].supported_query_fields
         assert avail_map[SourceType.LOGS].maximum_window_seconds == 86400
 

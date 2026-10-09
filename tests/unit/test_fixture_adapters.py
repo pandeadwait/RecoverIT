@@ -27,6 +27,7 @@ from collectors import (
     PipelineSource,
     ReplayAdapter,
     create_scenario_adapters,
+    FIXTURE_SOURCE_TYPES,
     list_available_scenarios,
     load_scenario_json,
     load_scenario_records,
@@ -82,7 +83,7 @@ class TestScenarioDataFiles:
     ):
         data = load_scenario_json(scenario_name)
         sources = data.get("sources", {})
-        for st in SourceType:
+        for st in FIXTURE_SOURCE_TYPES:
             assert st.value in sources, f"Source {st.value} missing in {scenario_name}"
             records = load_scenario_records(scenario_name, st)
             assert isinstance(records, list)
@@ -252,7 +253,7 @@ class TestScenarioFactory:
     def test_create_scenario_adapters_returns_all_six(self):
         adapters = create_scenario_adapters("memory_exhaustion")
         assert len(adapters) == 6
-        for st in SourceType:
+        for st in FIXTURE_SOURCE_TYPES:
             assert st in adapters
             assert adapters[st].source_type == st
             res = adapters[st].query(_make_query("q_factory", st))

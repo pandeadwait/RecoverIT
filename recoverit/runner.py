@@ -334,7 +334,17 @@ class InvestigationRunner:
         # 1. Discover capabilities
         p1_seed = Person1IncidentSeed.model_validate(seed.model_dump())
         p1_catalog = registry.capabilities(p1_seed)
-        p3_catalog = Person3Catalog.model_validate(p1_catalog.model_dump())
+        catalog_payload = p1_catalog.model_dump(mode="json")
+        for capability in catalog_payload["sources"]:
+            source_type = SourceType(capability["source_type"])
+            adapter = registry.get_source(source_type)
+            capability["adapter_name"] = getattr(
+                adapter, "adapter_name", "unregistered"
+            )
+            capability["unavailable_reason"] = (
+                None if capability["available"] else "No configured source adapter."
+            )
+        p3_catalog = Person3Catalog.model_validate(catalog_payload)
 
         # 2. Setup boundary adapters
         col_svc = Person1CollectionAdapter(DefaultCollectionService(registry=registry))

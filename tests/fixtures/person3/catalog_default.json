@@ -5,6 +5,7 @@
   "sources": [
     {
       "source_type": "logs",
+      "adapter_name": "fixture-logs",
       "available": true,
       "supported_query_fields": ["service", "severity", "limit"],
       "maximum_window_seconds": 3600,
@@ -12,6 +13,7 @@
     },
     {
       "source_type": "deployments",
+      "adapter_name": "fixture-deployments",
       "available": true,
       "supported_query_fields": ["service", "limit"],
       "maximum_window_seconds": 86400,
@@ -19,6 +21,7 @@
     },
     {
       "source_type": "metrics",
+      "adapter_name": "fixture-metrics",
       "available": true,
       "supported_query_fields": ["metric", "service", "limit"],
       "maximum_window_seconds": 3600,
@@ -26,6 +29,7 @@
     },
     {
       "source_type": "configuration",
+      "adapter_name": "fixture-configuration",
       "available": true,
       "supported_query_fields": ["service", "key"],
       "maximum_window_seconds": 86400,
@@ -33,6 +37,7 @@
     },
     {
       "source_type": "health",
+      "adapter_name": "fixture-health",
       "available": true,
       "supported_query_fields": ["service", "target"],
       "maximum_window_seconds": 3600,

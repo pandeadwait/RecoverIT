@@ -18,6 +18,7 @@ import pytest
 
 from collectors import (
     DefaultCollectionService,
+    FIXTURE_SOURCE_TYPES,
     create_scenario_adapters,
     list_available_scenarios,
 )
@@ -86,10 +87,12 @@ class TestEndToEndWorkflow:
         catalog: SourceCapabilityCatalog = registry.capabilities(seed)
 
         assert catalog.incident_id == seed.incident_id
-        assert len(catalog.sources) == 6
-        for source_cap in catalog.sources:
-            assert source_cap.available is True
-            assert len(source_cap.supported_query_fields) > 0
+        assert len(catalog.sources) == 7
+        by_source = {source.source_type: source for source in catalog.sources}
+        for source_type in FIXTURE_SOURCE_TYPES:
+            assert by_source[source_type].available is True
+            assert len(by_source[source_type].supported_query_fields) > 0
+        assert by_source[SourceType.HEALTH].available is False
 
         # 4. Hand-written EvidenceQueryPlan (simulating Person 3 Round 1)
         param_map = {
@@ -111,7 +114,7 @@ class TestEndToEndWorkflow:
                 discriminates_hypothesis_ids=["hyp_01", "hyp_02"],
                 expected_information_value=InformationValue.HIGH,
             )
-            for st in SourceType
+            for st in FIXTURE_SOURCE_TYPES
         ]
 
         plan = EvidenceQueryPlan(
@@ -144,7 +147,7 @@ class TestEndToEndWorkflow:
 
         # Check every source result in the batch
         by_source = {r.source_type: r for r in batch.results}
-        for st in SourceType:
+        for st in FIXTURE_SOURCE_TYPES:
             res = by_source[st]
             assert res.source_status == SourceStatus.OK
             assert len(res.records) > 0

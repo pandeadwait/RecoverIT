@@ -73,6 +73,7 @@ def sample_catalog(sample_incident: IncidentSeed) -> SourceCapabilityCatalog:
         sources=[
             SourceCapability(
                 source_type=SourceType.DEPLOYMENTS,
+                adapter_name="test-deployments",
                 available=True,
                 supported_query_fields=["service", "limit"],
                 maximum_window_seconds=86400,
@@ -80,6 +81,7 @@ def sample_catalog(sample_incident: IncidentSeed) -> SourceCapabilityCatalog:
             ),
             SourceCapability(
                 source_type=SourceType.LOGS,
+                adapter_name="test-logs",
                 available=True,
                 supported_query_fields=["service", "severity", "limit", "start_time", "end_time"],
                 maximum_window_seconds=3600,
@@ -87,6 +89,7 @@ def sample_catalog(sample_incident: IncidentSeed) -> SourceCapabilityCatalog:
             ),
             SourceCapability(
                 source_type=SourceType.METRICS,
+                adapter_name="test-metrics",
                 available=False,  # unavailable
                 supported_query_fields=["metric", "limit"],
                 maximum_window_seconds=3600,
@@ -350,6 +353,7 @@ def test_since_until_time_window_is_also_validated(
         sources=[
             SourceCapability(
                 source_type=SourceType.DEPLOYMENTS,
+                adapter_name="test-deployments",
                 available=True,
                 supported_query_fields=["service", "since", "until", "limit"],
                 maximum_window_seconds=604800,

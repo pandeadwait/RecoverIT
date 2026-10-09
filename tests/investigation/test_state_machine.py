@@ -194,7 +194,7 @@ def test_illegal_transitions_rejected_with_structured_error(
     error = sm.validate_transition(illegal_target)
     assert error is not None
     assert error.code == INVALID_STATE_TRANSITION
-    assert error.source == "investigation.orchestration.state_machine"
+    assert error.stage == "state_transition"
     assert error.details["incident_id"] == "inc_illegal"
     assert error.details["current_state"] == from_state.value
     assert error.details["target_state"] == illegal_target.value

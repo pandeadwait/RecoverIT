@@ -208,7 +208,7 @@ class EvidenceQueryPlanner:
                     code=BUDGET_EXHAUSTED,
                     message="Investigation query budget is exhausted.",
                     retryable=False,
-                    source="investigation.query_planning.planner",
+                    stage="plan_queries",
                     details={"max_queries": budget.max_queries},
                 )
             )
@@ -223,7 +223,7 @@ class EvidenceQueryPlanner:
                         f"Truncated {dropped_count} query(ies) to stay within limit {max_allowed_queries}."
                     ),
                     retryable=False,
-                    source="investigation.query_planning.planner",
+                    stage="plan_queries",
                     details={
                         "remaining_queries": max_allowed_queries,
                         "dropped_queries": dropped_count,
@@ -266,7 +266,8 @@ class EvidenceQueryPlanner:
                     f"Source '{query.source_type}' is not available in capability catalog."
                 ),
                 retryable=False,
-                source="investigation.query_planning.planner",
+                stage="plan_queries",
+                source_type=query.source_type,
                 details={
                     "query_id": query.query_id,
                     "source_type": query.source_type.value if hasattr(query.source_type, "value") else str(query.source_type),
@@ -284,7 +285,8 @@ class EvidenceQueryPlanner:
                         f"Supported fields: {capability.supported_query_fields}"
                     ),
                     retryable=False,
-                    source="investigation.query_planning.planner",
+                    stage="plan_queries",
+                    source_type=query.source_type,
                     details={
                         "query_id": query.query_id,
                         "unsupported_field": field,
@@ -304,7 +306,8 @@ class EvidenceQueryPlanner:
                             f"({capability.maximum_items}) for source '{query.source_type}'."
                         ),
                         retryable=False,
-                        source="investigation.query_planning.planner",
+                        stage="plan_queries",
+                        source_type=query.source_type,
                         details={
                             "query_id": query.query_id,
                             "requested_limit": limit_val,
@@ -316,7 +319,8 @@ class EvidenceQueryPlanner:
                     code=INVALID_QUERY,
                     message=f"Query limit '{query.parameters['limit']}' is not a valid integer.",
                     retryable=False,
-                    source="investigation.query_planning.planner",
+                    stage="plan_queries",
+                    source_type=query.source_type,
                     details={"query_id": query.query_id},
                 )
 
@@ -331,7 +335,8 @@ class EvidenceQueryPlanner:
                         f"({capability.maximum_window_seconds}s) for source '{query.source_type}'."
                     ),
                     retryable=False,
-                    source="investigation.query_planning.planner",
+                    stage="plan_queries",
+                    source_type=query.source_type,
                     details={
                         "query_id": query.query_id,
                         "requested_window_seconds": window_seconds,
@@ -348,7 +353,8 @@ class EvidenceQueryPlanner:
                     f"Duplicate query detected for source '{query.source_type}' with parameters {query.parameters}."
                 ),
                 retryable=False,
-                source="investigation.query_planning.planner",
+                stage="plan_queries",
+                source_type=query.source_type,
                 details={
                     "query_id": query.query_id,
                     "source_type": query.source_type.value if hasattr(query.source_type, "value") else str(query.source_type),

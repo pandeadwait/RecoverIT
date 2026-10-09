@@ -23,6 +23,7 @@ from contracts.common import (
     RootCauseCategory,
     StopReason,
 )
+from contracts.investigation.schemas import BudgetUsage
 
 
 # ---------------------------------------------------------------------------
@@ -243,13 +244,6 @@ class RankedHypothesis(ContractModel):
         ...,
         description="Detailed feature-by-feature breakdown.",
     )
-
-
-class BudgetUsage(ContractModel):
-    """How much of the investigation budget was consumed."""
-    rounds: int = Field(default=0, ge=0, description="Rounds used.")
-    queries: int = Field(default=0, ge=0, description="Queries executed.")
-    reasoning_calls: int = Field(default=0, ge=0, description="Reasoning calls made.")
 
 
 class RankedHypothesisSet(ContractModel):

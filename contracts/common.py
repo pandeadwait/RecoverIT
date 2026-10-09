@@ -4,12 +4,36 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
-from enum import StrEnum
 import json
+from enum import StrEnum
 from types import MappingProxyType
 from typing import Any, Literal, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from contracts.enums import (
+    ConfidenceLabel,
+    EvidenceRole,
+    EvidenceType,
+    HypothesisStatus,
+    InformationGapCategory,
+    InformationPriority,
+    InformationValueLevel,
+    InvestigationState,
+    InvestigationStatus,
+    RelationshipCreator,
+    RelationshipType,
+    Reliability,
+    RootCauseCategory,
+    Severity,
+    SourceCoverageState,
+    SourceCoverageStatus,
+    SourceStatus,
+    SourceType,
+    StopAction,
+    StopReason,
+    TimelineCategory,
+)
 
 SCHEMA_VERSION = "1.0"
 JSONValue = str | int | float | bool | None | tuple["JSONValue", ...] | Mapping[str, "JSONValue"]
@@ -24,170 +48,6 @@ class ContractValidationError(ValueError):
         self.path = path
         self.message = message
         super().__init__(f"{code} at {path}: {message}")
-
-
-class SourceType(StrEnum):
-    LOGS = "logs"
-    METRICS = "metrics"
-    CHANGES = "changes"
-    DEPLOYMENTS = "deployments"
-    PIPELINES = "pipelines"
-    CONFIGURATION = "configuration"
-    HEALTH = "health"
-    OPERATOR = "operator"
-
-
-class Severity(StrEnum):
-    INFO = "info"
-    WARNING = "warning"
-    CRITICAL = "critical"
-
-
-class SourceStatus(StrEnum):
-    OK = "ok"
-    UNAVAILABLE = "unavailable"
-    TIMEOUT = "timeout"
-    ERROR = "error"
-    PARTIAL = "partial"
-
-
-class Reliability(StrEnum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    UNKNOWN = "unknown"
-
-
-class SourceCoverageState(StrEnum):
-    AVAILABLE = "available"
-    EMPTY = "empty"
-    NOT_QUERIED = "not_queried"
-    UNAVAILABLE = "unavailable"
-
-
-# Person 3's schema name for the same wire-level concept.
-SourceCoverageStatus = SourceCoverageState
-
-
-class EvidenceType(StrEnum):
-    LOG_EVENT = "log_event"
-    ERROR_EVENT = "error_event"
-    WARNING_EVENT = "warning_event"
-    INFO_EVENT = "info_event"
-    METRIC_ANOMALY = "metric_anomaly"
-    METRIC_NORMAL = "metric_normal"
-    METRIC_OBSERVATION = "metric_observation"
-    CODE_CHANGE = "code_change"
-    SOURCE_CHANGE = "source_change"
-    CONFIGURATION_CHANGE = "configuration_change"
-    DEPLOYMENT_EVENT = "deployment_event"
-    PIPELINE_RESULT = "pipeline_result"
-    PIPELINE_EVENT = "pipeline_event"
-    HEALTH_CHECK = "health_check"
-    OPERATOR_NOTE = "operator_note"
-
-
-class TimelineCategory(StrEnum):
-    CHANGE = "change"
-    DEPLOYMENT = "deployment"
-    SYMPTOM = "symptom"
-    ALERT = "alert"
-    ACTION = "action"
-    VERIFICATION = "verification"
-
-
-class RelationshipType(StrEnum):
-    PRECEDES = "PRECEDES"
-    COINCIDES_WITH = "COINCIDES_WITH"
-    SUPPORTS = "SUPPORTS"
-    CONTRADICTS = "CONTRADICTS"
-    DEPLOYED_FROM = "DEPLOYED_FROM"
-    AFFECTS = "AFFECTS"
-    OBSERVED_ON = "OBSERVED_ON"
-    PREDICTS = "PREDICTS"
-
-
-class RelationshipCreator(StrEnum):
-    DETERMINISTIC = "deterministic"
-    MODEL = "model"
-    OPERATOR = "operator"
-
-
-class HypothesisStatus(StrEnum):
-    ACTIVE = "active"
-    WEAKENED = "weakened"
-    REJECTED = "rejected"
-    SELECTED = "selected"
-
-
-class ConfidenceLabel(StrEnum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-
-
-class RootCauseCategory(StrEnum):
-    CONFIGURATION_REGRESSION = "configuration_regression"
-    RESOURCE_EXHAUSTION = "resource_exhaustion"
-    DEPENDENCY_INCOMPATIBILITY = "dependency_incompatibility"
-    DATABASE_OUTAGE = "database_outage"
-    DEPLOYMENT_FAILURE = "deployment_failure"
-    CODE_DEFECT = "code_defect"
-    INFRASTRUCTURE_FAILURE = "infrastructure_failure"
-    EXTERNAL_DEPENDENCY_FAILURE = "external_dependency_failure"
-    UNKNOWN = "unknown"
-
-
-class InformationPriority(StrEnum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-
-
-class InformationGapCategory(StrEnum):
-    SYMPTOM_CONFIRMATION = "symptom_confirmation"
-    TEMPORAL_CORRELATION = "temporal_correlation"
-    DIRECT_CAUSAL_EVIDENCE = "direct_causal_evidence"
-    CONTRADICTING_EVIDENCE = "contradicting_evidence"
-
-
-class EvidenceRole(StrEnum):
-    CAUSE = "cause"
-    EFFECT = "effect"
-    CORRELATION = "correlation"
-    CONTRADICTION = "contradiction"
-    CONTEXT = "context"
-
-
-class InvestigationState(StrEnum):
-    RECEIVED = "RECEIVED"
-    ASSESSING_GAPS = "ASSESSING_GAPS"
-    COLLECTING_EVIDENCE = "COLLECTING_EVIDENCE"
-    BUILDING_TIMELINE = "BUILDING_TIMELINE"
-    GENERATING_HYPOTHESES = "GENERATING_HYPOTHESES"
-    RANKING = "RANKING"
-    COMPLETED = "COMPLETED"
-    INCONCLUSIVE = "INCONCLUSIVE"
-    CANCELLED = "CANCELLED"
-
-
-class InvestigationStatus(StrEnum):
-    COMPLETED = "completed"
-    INCONCLUSIVE = "inconclusive"
-
-
-class StopReason(StrEnum):
-    SUFFICIENT_EVIDENCE = "sufficient_evidence"
-    BUDGET_EXHAUSTED = "budget_exhausted"
-    INSUFFICIENT_EVIDENCE = "insufficient_evidence"
-    SOURCES_UNAVAILABLE = "sources_unavailable"
-    REPEATED_INVALID_OUTPUT = "repeated_invalid_output"
-
-
-class InformationValueLevel(StrEnum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
 
 
 class BoundaryModel(BaseModel):

@@ -7,12 +7,9 @@ handle failures uniformly without catching vendor-specific exceptions.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal
-
-from pydantic import Field
+from typing import Any
 
 from contracts.common import (
-    BoundaryModel,
     ContractValidationError,
     SCHEMA_VERSION,
     freeze_json,
@@ -23,17 +20,7 @@ from contracts.common import (
     require_string,
     thaw_json,
 )
-
-
-class StructuredError(BoundaryModel):
-    """Source-neutral error returned by adapters and services."""
-
-    schema_version: Literal["1.0"] = "1.0"
-    code: str
-    message: str
-    retryable: bool = False
-    source: str | None = None
-    details: dict[str, Any] = Field(default_factory=dict)
+from contracts.errors.schemas import ProgressEvent, StructuredError
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,5 +150,6 @@ __all__ = [
     "ContractValidationError",
     "ProcessingError",
     "ProcessingWarning",
+    "ProgressEvent",
     "StructuredError",
 ]

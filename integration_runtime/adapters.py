@@ -37,13 +37,18 @@ class Person1CollectionAdapter:
         self, plan: Person3EvidenceQueryPlan
     ) -> Person3RawEvidenceBatch:
         plan_payload = plan.model_dump(mode="json")
+        plan_payload["round"] = plan_payload.pop("round_number")
         for query in plan_payload["queries"]:
             query.pop("schema_version", None)
         person1_plan = Person1EvidenceQueryPlan.model_validate(plan_payload)
         batch = await asyncio.to_thread(
             self._service.execute, person1_plan, self._catalog
         )
-        return Person3RawEvidenceBatch.model_validate(batch.model_dump(mode="json"))
+        batch_payload = batch.model_dump(mode="json")
+        for result in batch_payload["results"]:
+            result["started_at"] = batch_payload["collected_at"]
+            result["completed_at"] = batch_payload["collected_at"]
+        return Person3RawEvidenceBatch.model_validate(batch_payload)
 
 
 class Person2ContextAdapter:
@@ -95,8 +100,19 @@ class Person2ContextAdapter:
         batch_payload = batch.model_dump(mode="json")
         for result in batch_payload["results"]:
             result.pop("schema_version", None)
+            # These timestamps belong to the canonical LangGraph boundary.  The
+            # legacy processing model is intentionally strict, so keep this
+            # translation in the temporary integration adapter until that model
+            # is retired.
+            result.pop("started_at", None)
+            result.pop("completed_at", None)
             for record in result["records"]:
                 record.pop("schema_version", None)
+        for error in batch_payload["errors"]:
+            error.pop("stage", None)
+            source_type = error.pop("source_type", None)
+            if error.get("source") is None and source_type is not None:
+                error["source"] = source_type
         person2_batch = Person2RawEvidenceBatch.from_dict(batch_payload)
         processing = self._processing.process(self._incident, (person2_batch,))
         evidence_filter = EvidenceFilter(

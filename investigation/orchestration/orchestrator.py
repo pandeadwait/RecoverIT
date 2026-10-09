@@ -126,6 +126,7 @@ class InMemoryCollectionService:
         results: list[SourceResult] = []
 
         for q in plan.queries:
+            started_at = datetime.now(timezone.utc)
             st_val = q.source_type.value if hasattr(q.source_type, "value") else str(q.source_type)
             records = self.responses.get(
                 q.query_id,
@@ -145,6 +146,8 @@ class InMemoryCollectionService:
                     source_adapter=f"{st_val}_adapter",
                     source_status=self.default_status,
                     records=records,
+                    started_at=started_at,
+                    completed_at=datetime.now(timezone.utc),
                 )
             )
 

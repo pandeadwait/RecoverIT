@@ -78,6 +78,18 @@ DEFAULT_CAPABILITY_SPECS: dict[SourceType, dict] = {
         "maximum_window_seconds": 604800,
         "maximum_items": 200,
     },
+    SourceType.HEALTH: {
+        "supported_query_fields": [
+            "service",
+            "component",
+            "endpoint",
+            "start_time",
+            "end_time",
+            "limit",
+        ],
+        "maximum_window_seconds": 86400,
+        "maximum_items": 1000,
+    },
 }
 
 

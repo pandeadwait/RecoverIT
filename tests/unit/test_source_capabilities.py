@@ -88,8 +88,8 @@ class DummySource:
 
 
 class TestSourceRegistryCapabilities:
-    def test_empty_registry_includes_all_six_sources_marked_unavailable(self):
-        """All six source categories must be present, never omitted (WORK_DIVISION §6.5)."""
+    def test_empty_registry_includes_all_seven_sources_marked_unavailable(self):
+        """All seven source categories are present even when unavailable."""
         clock = FrozenClock(FIXED_NOW)
         registry = DefaultSourceRegistry(clock=clock)
         seed = _make_sample_seed("inc_100")
@@ -101,11 +101,11 @@ class TestSourceRegistryCapabilities:
         assert catalog.generated_at == FIXED_NOW
         assert catalog.schema_version == "1.0"
 
-        # Verify all 6 source types are included
+        # Verify all 7 source types are included
         returned_types = {s.source_type for s in catalog.sources}
         expected_types = set(SourceType)
         assert returned_types == expected_types
-        assert len(catalog.sources) == 6
+        assert len(catalog.sources) == 7
 
         # All are marked unavailable since no adapters are registered
         for s in catalog.sources:
@@ -137,13 +137,13 @@ class TestSourceRegistryCapabilities:
         assert by_type[SourceType.PIPELINES].available is False
         assert by_type[SourceType.CONFIGURATION].available is False
 
-    def test_all_six_sources_fully_registered(self):
+    def test_all_seven_sources_fully_registered(self):
         registry = DefaultSourceRegistry()
         for st in SourceType:
             registry.register_source(DummySource(st, available=True))
 
         catalog = registry.capabilities(_make_sample_seed())
-        assert len(catalog.sources) == 6
+        assert len(catalog.sources) == 7
         for s in catalog.sources:
             assert s.available is True
             assert len(s.supported_query_fields) > 0

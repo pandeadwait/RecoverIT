@@ -67,8 +67,16 @@ class TestSeverity:
 
 
 class TestSourceType:
-    def test_all_six_present(self):
-        expected = {"logs", "metrics", "changes", "deployments", "pipelines", "configuration"}
+    def test_all_seven_present(self):
+        expected = {
+            "logs",
+            "metrics",
+            "changes",
+            "deployments",
+            "pipelines",
+            "configuration",
+            "health",
+        }
         actual = {st.value for st in SourceType}
         assert actual == expected
 
@@ -79,7 +87,7 @@ class TestSourceType:
 
 class TestSourceStatus:
     def test_accepted_values(self):
-        for val in ("ok", "partial", "unavailable", "timeout", "error"):
+        for val in ("ok", "partial", "empty", "unavailable", "timeout", "error"):
             assert SourceStatus(val)
 
     def test_rejects_unknown(self):
@@ -89,12 +97,12 @@ class TestSourceStatus:
 
 class TestSourceCoverage:
     def test_accepted_values(self):
-        for val in ("available", "not_queried", "empty", "unavailable"):
+        for val in ("available", "not_queried", "empty", "partial", "unavailable"):
             assert SourceCoverage(val)
 
     def test_rejects_unknown(self):
         with pytest.raises(ValueError):
-            SourceCoverage("partial")
+            SourceCoverage("unknown")
 
 
 class TestInformationValue:
@@ -115,8 +123,9 @@ class TestStructuredError:
         err = StructuredError(
             code="SOURCE_UNAVAILABLE",
             message="The metrics source did not respond before the deadline.",
+            stage="collect_evidence",
             retryable=True,
-            source="metrics",
+            source_type=SourceType.METRICS,
             details={"query_id": "qry_123"},
         )
         json_str = err.model_dump_json()
@@ -124,23 +133,23 @@ class TestStructuredError:
         assert parsed == err
 
     def test_schema_version_present(self):
-        err = StructuredError(code="TEST", message="test")
+        err = StructuredError(code="TEST", message="test", stage="test")
         data = json.loads(err.model_dump_json())
         assert data["schema_version"] == "1.0"
 
     def test_defaults(self):
-        err = StructuredError(code="X", message="y")
+        err = StructuredError(code="X", message="y", stage="test")
         assert err.retryable is False
-        assert err.source is None
+        assert err.source_type is None
         assert err.details == {}
 
     def test_missing_required_code(self):
         with pytest.raises(ValidationError):
-            StructuredError(message="oops")  # type: ignore[call-arg]
+            StructuredError(message="oops", stage="test")  # type: ignore[call-arg]
 
     def test_missing_required_message(self):
         with pytest.raises(ValidationError):
-            StructuredError(code="ERR")  # type: ignore[call-arg]
+            StructuredError(code="ERR", stage="test")  # type: ignore[call-arg]
 
 
 # ── IncidentAlert ───────────────────────────────────────────────────
@@ -425,8 +434,9 @@ class TestRawEvidenceBatch:
                 StructuredError(
                     code="SOURCE_UNAVAILABLE",
                     message="Metrics source timed out.",
+                    stage="collect_evidence",
                     retryable=True,
-                    source="metrics",
+                    source_type=SourceType.METRICS,
                 ),
             ],
         )

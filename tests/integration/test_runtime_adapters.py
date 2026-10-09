@@ -145,7 +145,7 @@ async def test_timeout_batch_crosses_person1_to_person2_boundary() -> None:
     context = await Person2ContextAdapter(incident).build(incident.incident_id, batch)
 
     assert batch.results[0].source_status == "timeout"
-    assert batch.errors[0]["source"] == "logs"
+    assert batch.errors[0].source_type == "logs"
     assert context.source_coverage["logs"] == "unavailable"
 
 

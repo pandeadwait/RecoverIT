@@ -199,7 +199,7 @@ def test_check_affordable_raises_on_unaffordable(test_budget: InvestigationBudge
         tracker.check_affordable({"queries": 2})
 
     assert exc_info.value.error.code == BUDGET_EXHAUSTED
-    assert exc_info.value.error.source == "investigation.budgets.budget_tracker"
+    assert exc_info.value.error.stage == "budget_tracking"
 
 
 # ---------------------------------------------------------------------------

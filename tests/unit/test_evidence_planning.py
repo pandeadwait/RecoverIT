@@ -65,24 +65,28 @@ def sample_catalog(sample_incident: IncidentSeed) -> SourceCapabilityCatalog:
         sources=[
             SourceCapability(
                 source_type=SourceType.DEPLOYMENTS,
+                adapter_name="test-deployments",
                 available=True,
                 supported_query_fields=["service", "limit"],
                 maximum_items=50,
             ),
             SourceCapability(
                 source_type=SourceType.CHANGES,
+                adapter_name="test-changes",
                 available=True,
                 supported_query_fields=["service", "limit"],
                 maximum_items=50,
             ),
             SourceCapability(
                 source_type=SourceType.LOGS,
+                adapter_name="test-logs",
                 available=True,
                 supported_query_fields=["service", "severity", "limit"],
                 maximum_items=100,
             ),
             SourceCapability(
                 source_type=SourceType.METRICS,
+                adapter_name="test-metrics",
                 available=True,
                 supported_query_fields=["metric", "service", "limit"],
                 maximum_items=100,

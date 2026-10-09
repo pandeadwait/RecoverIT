@@ -52,6 +52,7 @@ def validate_query(
     - Time-window must not exceed maximum_window_seconds.
     """
     errors: list[StructuredError] = []
+    source_name = str(query.source_type)
 
     # 1. Source availability check
     if capability is None or not capability.available:
@@ -59,11 +60,12 @@ def validate_query(
             StructuredError(
                 code="SOURCE_UNAVAILABLE",
                 message=(
-                    f"Source type '{query.source_type.value}' is unavailable "
+                    f"Source type '{source_name}' is unavailable "
                     "or not registered in capability catalog."
                 ),
                 retryable=True,
-                source=query.source_type.value,
+                stage="collect_evidence",
+                source_type=query.source_type,
                 details={"query_id": query.query_id},
             )
         )
@@ -82,11 +84,12 @@ def validate_query(
                     code="INVALID_QUERY_FIELDS",
                     message=(
                         f"Query '{query.query_id}' contains unsupported fields for source "
-                        f"'{query.source_type.value}': {sorted(unsupported)}. "
+                        f"'{source_name}': {sorted(unsupported)}. "
                         f"Supported fields: {sorted(capability.supported_query_fields)}."
                     ),
                     retryable=False,
-                    source=query.source_type.value,
+                    stage="collect_evidence",
+                    source_type=query.source_type,
                     details={
                         "query_id": query.query_id,
                         "unsupported_fields": sorted(unsupported),
@@ -111,10 +114,11 @@ def validate_query(
                     message=(
                         f"Query '{query.query_id}' time window ({delta_seconds:.0f}s) "
                         f"exceeds maximum allowed window ({capability.maximum_window_seconds}s) "
-                        f"for source '{query.source_type.value}'."
+                        f"for source '{source_name}'."
                     ),
                     retryable=False,
-                    source=query.source_type.value,
+                    stage="collect_evidence",
+                    source_type=query.source_type,
                     details={
                         "query_id": query.query_id,
                         "window_seconds": delta_seconds,
@@ -264,7 +268,8 @@ class DefaultCollectionService:
                             code="SOURCE_ERROR",
                             message=f"Query '{query.query_id}' encountered error: {exc}",
                             retryable=False,
-                            source=query.source_type.value,
+                            stage="collect_evidence",
+                            source_type=query.source_type,
                             details={"query_id": query.query_id, "error": str(exc)},
                         )
                         errors.append(err_obj)
@@ -301,15 +306,17 @@ class DefaultCollectionService:
         self, query: EvidenceQuery, capability: SourceCapability | None
     ) -> tuple[QueryResult, StructuredError | None]:
         """Execute a single query against its registered adapter with timeout protection."""
+        source_name = str(query.source_type)
         adapter = getattr(self.registry, "get_source", lambda _: None)(
             query.source_type
         )
         if adapter is None:
             err = StructuredError(
                 code="SOURCE_UNAVAILABLE",
-                message=f"No adapter registered for source type '{query.source_type.value}'.",
+                message=f"No adapter registered for source type '{source_name}'.",
                 retryable=True,
-                source=query.source_type.value,
+                stage="collect_evidence",
+                source_type=query.source_type,
                 details={"query_id": query.query_id},
             )
             res = QueryResult(
@@ -332,25 +339,28 @@ class DefaultCollectionService:
             if res.source_status == SourceStatus.UNAVAILABLE:
                 err_obj = StructuredError(
                     code="SOURCE_UNAVAILABLE",
-                    message=f"Source '{query.source_type.value}' reported unavailable.",
+                    message=f"Source '{source_name}' reported unavailable.",
                     retryable=True,
-                    source=query.source_type.value,
+                    stage="collect_evidence",
+                    source_type=query.source_type,
                     details={"query_id": query.query_id},
                 )
             elif res.source_status == SourceStatus.TIMEOUT:
                 err_obj = StructuredError(
                     code="SOURCE_TIMEOUT",
-                    message=f"Source '{query.source_type.value}' query timed out.",
+                    message=f"Source '{source_name}' query timed out.",
                     retryable=True,
-                    source=query.source_type.value,
+                    stage="collect_evidence",
+                    source_type=query.source_type,
                     details={"query_id": query.query_id},
                 )
             elif res.source_status == SourceStatus.ERROR:
                 err_obj = StructuredError(
                     code="SOURCE_ERROR",
-                    message=f"Source '{query.source_type.value}' reported error.",
+                    message=f"Source '{source_name}' reported error.",
                     retryable=False,
-                    source=query.source_type.value,
+                    stage="collect_evidence",
+                    source_type=query.source_type,
                     details={"query_id": query.query_id},
                 )
 
@@ -361,7 +371,8 @@ class DefaultCollectionService:
                 code="SOURCE_ERROR",
                 message=f"Adapter execution failed for query '{query.query_id}': {exc}",
                 retryable=False,
-                source=query.source_type.value,
+                stage="collect_evidence",
+                source_type=query.source_type,
                 details={"query_id": query.query_id, "error": str(exc)},
             )
             res = QueryResult(

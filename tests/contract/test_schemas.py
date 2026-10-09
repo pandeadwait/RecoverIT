@@ -116,7 +116,7 @@ class TestEnumerations:
 
     def test_source_type_values(self):
         expected = {"logs", "metrics", "changes", "deployments",
-                    "pipelines", "configuration", "health", "operator"}
+                    "pipelines", "configuration", "health"}
         assert {st.value for st in SourceType} == expected
 
     def test_hypothesis_status_values(self):
@@ -137,11 +137,11 @@ class TestEnumerations:
     def test_stop_reason_values(self):
         expected = {"sufficient_evidence", "budget_exhausted",
                     "insufficient_evidence", "sources_unavailable",
-                    "repeated_invalid_output"}
+                    "repeated_invalid_output", "cancelled"}
         assert {sr.value for sr in StopReason} == expected
 
     def test_investigation_status_values(self):
-        expected = {"completed", "inconclusive"}
+        expected = {"completed", "inconclusive", "cancelled"}
         assert {s.value for s in InvestigationStatus} == expected
 
     def test_timeline_category_values(self):
@@ -165,8 +165,9 @@ class TestStructuredError:
         err = StructuredError(
             code="SOURCE_UNAVAILABLE",
             message="Metrics source timed out.",
+            stage="collect_evidence",
             retryable=True,
-            source="metrics",
+            source_type=SourceType.METRICS,
             details={"query_id": "qry_123"},
         )
         assert err.schema_version == "1.0"
@@ -235,6 +236,7 @@ class TestSourceCapabilityCatalog:
             sources=[
                 SourceCapability(
                     source_type=SourceType.LOGS,
+                    adapter_name="test-logs",
                     available=True,
                     supported_query_fields=[
                         "service", "start_time", "end_time", "severity",
@@ -245,6 +247,7 @@ class TestSourceCapabilityCatalog:
                 ),
                 SourceCapability(
                     source_type=SourceType.METRICS,
+                    adapter_name="test-metrics",
                     available=True,
                     supported_query_fields=[
                         "service", "metric_name", "start_time", "end_time",
@@ -255,6 +258,7 @@ class TestSourceCapabilityCatalog:
                 ),
                 SourceCapability(
                     source_type=SourceType.CONFIGURATION,
+                    adapter_name="test-configuration",
                     available=True,
                     supported_query_fields=[
                         "service", "start_time", "end_time", "keys",
@@ -282,6 +286,8 @@ class TestRawEvidenceBatch:
                     source_type=SourceType.LOGS,
                     source_adapter="configured-log-adapter",
                     source_status=SourceStatus.OK,
+                    started_at=NOW,
+                    completed_at=NOW,
                     truncated=False,
                     records=[
                         RawRecord(

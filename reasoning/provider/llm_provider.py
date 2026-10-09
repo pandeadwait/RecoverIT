@@ -532,8 +532,12 @@ class LLMReasoningProvider:
                 code=REASONING_PROVIDER_ERROR,
                 message=f"LLM call failed after {retry_count} retries: {last_error}",
                 retryable=True,
-                source=self._provider_name,
-                details={"method": method, "model": self._model},
+                stage="reasoning_provider",
+                details={
+                    "method": method,
+                    "model": self._model,
+                    "provider": self._provider_name,
+                },
             )
             raise LLMProviderError(err)
 
@@ -581,10 +585,11 @@ class LLMReasoningProvider:
                     code=SCHEMA_VALIDATION_FAILED,
                     message=f"LLM output failed schema validation after repair attempt: {repair_exc}",
                     retryable=False,
-                    source=self._provider_name,
+                    stage="reasoning_provider",
                     details={
                         "method": method,
                         "model": self._model,
+                        "provider": self._provider_name,
                         "validation_error": str(validation_err),
                         "repair_error": str(repair_exc),
                     },

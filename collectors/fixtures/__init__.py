@@ -17,6 +17,19 @@ from collectors.interfaces import BaseSource
 from contracts.enums import SourceType
 
 
+# Historical replay fixtures intentionally cover the six recorded source
+# families.  HEALTH is a live adapter responsibility and must not be faked by
+# inserting scenario-specific canned responses.
+FIXTURE_SOURCE_TYPES: tuple[SourceType, ...] = (
+    SourceType.LOGS,
+    SourceType.METRICS,
+    SourceType.CHANGES,
+    SourceType.DEPLOYMENTS,
+    SourceType.PIPELINES,
+    SourceType.CONFIGURATION,
+)
+
+
 def create_scenario_adapters(
     scenario_name: str,
 ) -> dict[SourceType, BaseSource]:
@@ -57,4 +70,5 @@ __all__ = [
     "CANONICAL_SCENARIOS",
     "canonical_scenario_id",
     "resolve_scenario_name",
+    "FIXTURE_SOURCE_TYPES",
 ]

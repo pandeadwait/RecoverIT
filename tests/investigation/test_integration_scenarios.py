@@ -101,6 +101,7 @@ def base_catalog() -> SourceCapabilityCatalog:
         sources=[
             SourceCapability(
                 source_type=SourceType.LOGS,
+                adapter_name="test-logs",
                 available=True,
                 supported_query_fields=["service", "severity", "limit", "start_time", "end_time"],
                 maximum_window_seconds=3600,
@@ -108,6 +109,7 @@ def base_catalog() -> SourceCapabilityCatalog:
             ),
             SourceCapability(
                 source_type=SourceType.DEPLOYMENTS,
+                adapter_name="test-deployments",
                 available=True,
                 supported_query_fields=["service", "limit"],
                 maximum_window_seconds=86400,
@@ -115,6 +117,7 @@ def base_catalog() -> SourceCapabilityCatalog:
             ),
             SourceCapability(
                 source_type=SourceType.METRICS,
+                adapter_name="test-metrics",
                 available=True,
                 supported_query_fields=["metric", "service", "limit"],
                 maximum_window_seconds=3600,
@@ -122,6 +125,7 @@ def base_catalog() -> SourceCapabilityCatalog:
             ),
             SourceCapability(
                 source_type=SourceType.CHANGES,
+                adapter_name="test-changes",
                 available=True,
                 supported_query_fields=["service", "limit"],
                 maximum_window_seconds=86400,
@@ -129,6 +133,7 @@ def base_catalog() -> SourceCapabilityCatalog:
             ),
             SourceCapability(
                 source_type=SourceType.HEALTH,
+                adapter_name="test-health",
                 available=True,
                 supported_query_fields=["service"],
                 maximum_window_seconds=3600,
@@ -136,6 +141,7 @@ def base_catalog() -> SourceCapabilityCatalog:
             ),
             SourceCapability(
                 source_type=SourceType.PIPELINES,
+                adapter_name="test-pipelines",
                 available=True,
                 supported_query_fields=["service", "limit"],
                 maximum_window_seconds=86400,

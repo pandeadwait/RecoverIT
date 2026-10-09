@@ -7,11 +7,12 @@ at trust boundaries. See WORK_DIVISION.md §5.1.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from pydantic import Field
 
-from contracts.common import ContractModel
+from contracts.common import ContractModel, SourceType
 
 
 class StructuredError(ContractModel):
@@ -40,14 +41,32 @@ class StructuredError(ContractModel):
         default=False,
         description="Whether the operation may be retried.",
     )
-    source: str | None = Field(
+    stage: str = Field(
+        ...,
+        description="Workflow stage where the error occurred.",
+    )
+    source_type: SourceType | None = Field(
         default=None,
-        description="Component or source that originated the error.",
+        description="Operational source category, when applicable.",
     )
     details: dict[str, Any] = Field(
         default_factory=dict,
         description="Additional machine-readable context.",
     )
+
+
+class ProgressEvent(ContractModel):
+    """Display-safe workflow event shared by graph, CLI, and web clients."""
+
+    event_id: str
+    incident_id: str
+    kind: str
+    stage: str
+    title: str
+    detail: str = ""
+    output: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
 
 
 # ---------------------------------------------------------------------------

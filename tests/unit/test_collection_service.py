@@ -122,7 +122,9 @@ class TestCollectionServiceExecution:
         assert len(res.records) > 0
 
     def test_all_six_source_categories_in_one_batch(self):
-        """Verify queries across all six source categories can be executed together."""
+        """Verify all recorded fixture source categories execute together."""
+        from collectors import FIXTURE_SOURCE_TYPES
+
         service, _ = _setup_service_with_scenario("bad_db_config")
         param_map = {
             SourceType.LOGS: {"limit": 10},
@@ -140,7 +142,7 @@ class TestCollectionServiceExecution:
                 parameters=param_map[st],
                 expected_information_value=InformationValue.MEDIUM,
             )
-            for st in SourceType
+            for st in FIXTURE_SOURCE_TYPES
         ]
         plan = _make_sample_plan(queries=queries)
 
@@ -149,7 +151,7 @@ class TestCollectionServiceExecution:
         assert len(batch.results) == 6
         assert batch.errors == []
         returned_sources = {r.source_type for r in batch.results}
-        assert returned_sources == set(SourceType)
+        assert returned_sources == set(FIXTURE_SOURCE_TYPES)
 
         for res in batch.results:
             assert res.source_status == SourceStatus.OK
@@ -254,7 +256,8 @@ class TestQueryValidationRules:
         assert len(batch.errors) > 0
         err = next(e for e in batch.errors if e.code == "SOURCE_UNAVAILABLE")
         assert err.retryable is True
-        assert err.source == "metrics"
+        assert err.stage == "collect_evidence"
+        assert err.source_type == SourceType.METRICS
         assert batch.results[0].source_status == SourceStatus.UNAVAILABLE
 
 

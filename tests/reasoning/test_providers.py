@@ -83,6 +83,7 @@ def sample_catalog(sample_incident: IncidentSeed) -> SourceCapabilityCatalog:
         sources=[
             SourceCapability(
                 source_type=SourceType.LOGS,
+                adapter_name="test-logs",
                 available=True,
                 supported_query_fields=["service", "severity", "limit"],
                 maximum_window_seconds=3600,
@@ -90,6 +91,7 @@ def sample_catalog(sample_incident: IncidentSeed) -> SourceCapabilityCatalog:
             ),
             SourceCapability(
                 source_type=SourceType.DEPLOYMENTS,
+                adapter_name="test-deployments",
                 available=True,
                 supported_query_fields=["service", "limit"],
                 maximum_window_seconds=86400,
@@ -97,6 +99,7 @@ def sample_catalog(sample_incident: IncidentSeed) -> SourceCapabilityCatalog:
             ),
             SourceCapability(
                 source_type=SourceType.METRICS,
+                adapter_name="test-metrics",
                 available=True,
                 supported_query_fields=["metric", "service", "limit"],
                 maximum_window_seconds=3600,

@@ -36,7 +36,7 @@ class DefaultSourceRegistry:
     Owned responsibilities (WORK_DIVISION §6.2, §6.6):
     - Maintain server-owned registry of source adapters.
     - Query registered adapters dynamically or use registered capabilities.
-    - Guarantee all six source categories are represented in catalog.
+    - Guarantee all seven canonical source categories are represented in catalog.
     - Handle unreachable/failing sources gracefully (mark available=False).
     - Emit vendor-neutral SourceCapabilityCatalog validated against schema.
     """
@@ -69,7 +69,7 @@ class DefaultSourceRegistry:
     def capabilities(self, incident: IncidentSeed) -> SourceCapabilityCatalog:
         """Generate a complete SourceCapabilityCatalog for the incident.
 
-        All six source categories are always present. Unavailable or failing
+        All seven source categories are always present. Unavailable or failing
         sources are marked available=False rather than omitted or crashing.
         """
         sources_list: list[SourceCapability] = []

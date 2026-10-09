@@ -130,7 +130,7 @@ class CitationValidator:
                     code=CITATION_INVALID,
                     message=f"Hypothesis '{hypothesis.hypothesis_id}' contains no supporting evidence citations.",
                     retryable=False,
-                    source="reasoning.hypotheses.citation_validator",
+                    stage="validate_citations",
                     details={"hypothesis_id": hypothesis.hypothesis_id},
                 )
             )
@@ -186,7 +186,7 @@ class CitationValidator:
                             f"without an explicit differentiating explanation."
                         ),
                         retryable=False,
-                        source="reasoning.hypotheses.citation_validator",
+                        stage="validate_citations",
                         details={
                             "hypothesis_id": hypothesis.hypothesis_id,
                             "evidence_id": eid,
@@ -219,7 +219,7 @@ class CitationValidator:
                             f"claim remains an assumption without direct causal proof."
                         ),
                         retryable=False,
-                        source="reasoning.hypotheses.citation_validator",
+                        stage="validate_citations",
                         details={
                             "hypothesis_id": hypothesis.hypothesis_id,
                             "root_cause_category": cat_val,
@@ -246,7 +246,7 @@ class CitationValidator:
                             f"claim remains an assumption without direct causal proof."
                         ),
                         retryable=False,
-                        source="reasoning.hypotheses.citation_validator",
+                        stage="validate_citations",
                         details={
                             "hypothesis_id": hypothesis.hypothesis_id,
                             "root_cause_category": cat_val,
@@ -286,7 +286,7 @@ class CitationValidator:
                     code=CITATION_INVALID,
                     message=f"{citation_type.capitalize()} citation for evidence '{cit.evidence_id}' lacks a reason.",
                     retryable=False,
-                    source="reasoning.hypotheses.citation_validator",
+                    stage="validate_citations",
                     details={
                         "hypothesis_id": hypothesis.hypothesis_id,
                         "evidence_id": cit.evidence_id,
@@ -304,7 +304,7 @@ class CitationValidator:
                         f"and is not valid for incident '{hypothesis.incident_id}'."
                     ),
                     retryable=False,
-                    source="reasoning.hypotheses.citation_validator",
+                    stage="validate_citations",
                     details={
                         "hypothesis_id": hypothesis.hypothesis_id,
                         "evidence_id": cit.evidence_id,
@@ -327,7 +327,7 @@ class CitationValidator:
                             code=CROSS_INCIDENT_REFERENCE,
                             message=f"Evidence '{cit.evidence_id}' belongs to incident '{rec_incident_id}'.",
                             retryable=False,
-                            source="reasoning.hypotheses.citation_validator",
+                            stage="validate_citations",
                             details={
                                 "evidence_id": cit.evidence_id,
                                 "incident_id": rec_incident_id,
@@ -343,7 +343,7 @@ class CitationValidator:
                     code=CITATION_INVALID,
                     message=f"Evidence ID '{cit.evidence_id}' does not exist in context or repository.",
                     retryable=False,
-                    source="reasoning.hypotheses.citation_validator",
+                    stage="validate_citations",
                     details={
                         "hypothesis_id": hypothesis.hypothesis_id,
                         "evidence_id": cit.evidence_id,
@@ -378,7 +378,7 @@ class CitationValidator:
                             f"not independently prove a {cat_val}."
                         ),
                         retryable=False,
-                        source="reasoning.hypotheses.citation_validator",
+                        stage="validate_citations",
                         details={
                             "hypothesis_id": hypothesis.hypothesis_id,
                             "evidence_id": cit.evidence_id,

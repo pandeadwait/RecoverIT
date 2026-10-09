@@ -41,7 +41,7 @@ def validate_alert(raw_data: Any) -> IncidentAlert:
                 code="INVALID_ALERT_TYPE",
                 message=f"Alert input must be dict, JSON string, or IncidentAlert, got {type_name}.",
                 retryable=False,
-                source="alert_validation",
+                stage="alert_validation",
                 details={"input_type": type_name},
             )
             raise AlertValidationError(structured_err.message, structured_err)
@@ -56,7 +56,7 @@ def validate_alert(raw_data: Any) -> IncidentAlert:
             code="INVALID_ALERT_PAYLOAD",
             message=combined_msg,
             retryable=False,
-            source="alert_validation",
+            stage="alert_validation",
             details={"validation_errors": e.errors()},
         )
         raise AlertValidationError(combined_msg, structured_err) from e

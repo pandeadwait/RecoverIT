@@ -10,16 +10,16 @@ See WORK_DIVISION.md §8.4 and §8.5.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from pydantic import AliasChoices, Field
 
-from pydantic import AliasChoices, Field, model_validator
+from contracts.collection.schemas import EvidenceQuery, EvidenceQueryPlan
 
 from contracts.common import (
     ContractModel,
     InformationGapCategory,
     InformationPriority,
-    InformationValueLevel,
     SourceType,
+    StopAction,
     StopReason,
 )
 
@@ -78,6 +78,26 @@ class InvestigationBudget(ContractModel):
         ge=1,
         description="Maximum hypotheses to generate.",
     )
+
+
+class BudgetUsage(ContractModel):
+    """Provider-neutral resources consumed by an investigation."""
+
+    rounds: int = Field(default=0, ge=0)
+    queries: int = Field(default=0, ge=0)
+    reasoning_calls: int = Field(default=0, ge=0)
+    input_units: int = Field(default=0, ge=0)
+    output_units: int = Field(default=0, ge=0)
+
+
+class StopDecision(ContractModel):
+    """Deterministic instruction consumed by the graph router."""
+
+    action: StopAction
+    reason: str
+    stop_reason: StopReason | None = None
+    criteria_status: dict[str, bool] = Field(default_factory=dict)
+    unresolved_criteria: list[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -165,75 +185,19 @@ class MissingInformationAssessment(ContractModel):
     )
 
 
-# ---------------------------------------------------------------------------
-# Evidence Query Plan (Person 3 → Person 1)
-# ---------------------------------------------------------------------------
+# Compatibility name for pre-migration imports.  It is an alias, not a second
+# schema, so every producer and consumer now shares one query model.
+EvidenceQueryPlanQuery = EvidenceQuery
 
 
-class EvidenceQueryPlanQuery(ContractModel):
-    """A single query to execute against a data source."""
-    query_id: str = Field(
-        ...,
-        description="Unique identifier for this query.",
-    )
-    source_type: SourceType = Field(
-        ...,
-        description="Which source category to query.",
-    )
-    question: str = Field(
-        ...,
-        description="Human-readable description of what this query seeks.",
-    )
-    parameters: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Source-neutral typed query parameters.",
-    )
-    related_information_ids: list[str] = Field(
-        default_factory=list,
-        description="MissingInformationItem IDs this query addresses.",
-    )
-    discriminates_hypothesis_ids: list[str] = Field(
-        default_factory=list,
-        description="Hypothesis IDs this query could strengthen or weaken.",
-    )
-    expected_information_value: InformationValueLevel = Field(
-        default=InformationValueLevel.MEDIUM,
-        description="Expected value of the information this query provides.",
-    )
-
-
-class EvidenceQueryPlan(ContractModel):
-    """
-    A set of queries to collect evidence for the current investigation round.
-
-    Produced by Person 3; consumed by Person 1's CollectionService.
-    The plan can contain zero queries only when stop_reason is present.
-
-    See WORK_DIVISION.md §8.5.
-    """
-    incident_id: str = Field(..., description="Parent incident.")
-    plan_id: str = Field(
-        ...,
-        description="Unique identifier for this plan.",
-    )
-    round: int = Field(
-        ...,
-        ge=1,
-        description="Which investigation round this plan belongs to.",
-    )
-    queries: list[EvidenceQueryPlanQuery] = Field(
-        default_factory=list,
-        description="Queries to execute.",
-    )
-    stop_reason: StopReason | None = Field(
-        default=None,
-        description="If set, no queries are needed and investigation should stop.",
-    )
-
-    @model_validator(mode="after")
-    def require_queries_or_stop_reason(self) -> "EvidenceQueryPlan":
-        if not self.queries and self.stop_reason is None:
-            raise ValueError("an empty query plan requires stop_reason")
-        if self.queries and self.stop_reason is not None:
-            raise ValueError("stop_reason requires an empty query list")
-        return self
+__all__ = [
+    "BudgetUsage",
+    "EvidenceQuery",
+    "EvidenceQueryPlan",
+    "EvidenceQueryPlanQuery",
+    "InvestigationBudget",
+    "KnownFact",
+    "MissingInformationAssessment",
+    "MissingInformationItem",
+    "StopDecision",
+]

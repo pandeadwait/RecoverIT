@@ -6,6 +6,7 @@ from collectors.configuration.fixture_adapter import (
 )
 from collectors.deployments.fixture_adapter import FixtureDeploymentAdapter
 from collectors.fixtures import (
+    FIXTURE_SOURCE_TYPES,
     ReplayAdapter,
     create_scenario_adapters,
     list_available_scenarios,
@@ -54,6 +55,7 @@ __all__ = [
     "LocalGitChangeAdapter",
     "FileLogAdapter",
     "ReplayAdapter",
+    "FIXTURE_SOURCE_TYPES",
     "create_scenario_adapters",
     "list_available_scenarios",
     "load_scenario_json",

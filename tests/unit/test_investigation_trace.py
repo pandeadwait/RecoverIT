@@ -87,6 +87,7 @@ def sample_catalog(sample_incident: IncidentSeed) -> SourceCapabilityCatalog:
         sources=[
             SourceCapability(
                 source_type=SourceType.LOGS,
+                adapter_name="test-logs",
                 available=True,
                 supported_query_fields=["service", "severity", "limit"],
                 maximum_window_seconds=3600,
@@ -94,6 +95,7 @@ def sample_catalog(sample_incident: IncidentSeed) -> SourceCapabilityCatalog:
             ),
             SourceCapability(
                 source_type=SourceType.DEPLOYMENTS,
+                adapter_name="test-deployments",
                 available=True,
                 supported_query_fields=["service", "limit"],
                 maximum_window_seconds=86400,
@@ -101,6 +103,7 @@ def sample_catalog(sample_incident: IncidentSeed) -> SourceCapabilityCatalog:
             ),
             SourceCapability(
                 source_type=SourceType.METRICS,
+                adapter_name="test-metrics",
                 available=True,
                 supported_query_fields=["metric", "service", "limit"],
                 maximum_window_seconds=3600,
@@ -246,6 +249,8 @@ def test_metadata_propagation() -> None:
         source_type=SourceType.CHANGES,
         source_adapter="changes_fixture_adapter",
         source_status=SourceStatus.OK,
+        started_at=datetime.now(timezone.utc),
+        completed_at=datetime.now(timezone.utc),
         records=[
             RawRecord(
                 source_record_id="commit_abc123",
@@ -302,6 +307,8 @@ def test_long_output_truncation_without_hiding_counts_or_warnings() -> None:
         source_type=SourceType.LOGS,
         source_adapter="logs_fixture_adapter",
         source_status=SourceStatus.OK,
+        started_at=datetime.now(timezone.utc),
+        completed_at=datetime.now(timezone.utc),
         records=records,
         warnings=["Buffer truncated on server side"],
     )
@@ -485,6 +492,8 @@ def test_interpretation_and_decision_synthesis() -> None:
         source_type=SourceType.CHANGES,
         source_adapter="changes_fixture_adapter",
         source_status=SourceStatus.OK,
+        started_at=datetime.now(timezone.utc),
+        completed_at=datetime.now(timezone.utc),
         records=[RawRecord(source_record_id="c1", event_time=None, content_type="json", payload={"commit_sha": "abcdef12", "message": "Tweak pool"})],
     )
     interp = InvestigationOrchestrator._synthesize_interpretation(q_chg, r_chg, 1)
@@ -505,6 +514,8 @@ def test_interpretation_and_decision_synthesis() -> None:
         source_type=SourceType.DEPLOYMENTS,
         source_adapter="deployments_fixture_adapter",
         source_status=SourceStatus.OK,
+        started_at=datetime.now(timezone.utc),
+        completed_at=datetime.now(timezone.utc),
         records=[RawRecord(source_record_id="d1", event_time=None, content_type="json", payload={"version": "v1.2.3", "status": "succeeded"})],
     )
     interp_dep = InvestigationOrchestrator._synthesize_interpretation(q_dep, r_dep, 1)
@@ -525,6 +536,8 @@ def test_interpretation_and_decision_synthesis() -> None:
         source_type=SourceType.CONFIGURATION,
         source_adapter="configuration_fixture_adapter",
         source_status=SourceStatus.OK,
+        started_at=datetime.now(timezone.utc),
+        completed_at=datetime.now(timezone.utc),
         records=[RawRecord(source_record_id="k1", event_time=None, content_type="json", payload={"key": "db.timeout", "old_value": "30", "new_value": "1"})],
     )
     interp_cfg = InvestigationOrchestrator._synthesize_interpretation(q_cfg, r_cfg, 1)
@@ -537,6 +550,8 @@ def test_interpretation_and_decision_synthesis() -> None:
         source_type=SourceType.CHANGES,
         source_adapter="changes_fixture_adapter",
         source_status=SourceStatus.OK,
+        started_at=datetime.now(timezone.utc),
+        completed_at=datetime.now(timezone.utc),
         records=[],
     )
     interp_empty = InvestigationOrchestrator._synthesize_interpretation(q_chg, r_empty, 1)

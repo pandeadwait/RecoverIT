@@ -264,7 +264,7 @@ class InvestigationStateMachine:
                 code=INVALID_STATE_TRANSITION,
                 message=f"Unknown target state: '{target_state}'.",
                 retryable=False,
-                source="investigation.orchestration.state_machine",
+                stage="state_transition",
                 details={
                     "incident_id": self._incident_id,
                     "current_state": self._current_state.value,
@@ -282,7 +282,7 @@ class InvestigationStateMachine:
                     f"to '{target.value}' for incident '{self._incident_id}'."
                 ),
                 retryable=False,
-                source="investigation.orchestration.state_machine",
+                stage="state_transition",
                 details={
                     "incident_id": self._incident_id,
                     "current_state": self._current_state.value,

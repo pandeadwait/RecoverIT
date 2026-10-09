@@ -240,11 +240,13 @@ async def test_llm_prompts_have_zero_answer_leakage():
             sources=[
                 SourceCapability(
                     source_type=SourceType.LOGS,
+                    adapter_name="test-logs",
                     available=True,
                     supported_query_fields=["service", "limit"],
                 ),
                 SourceCapability(
                     source_type=SourceType.CHANGES,
+                    adapter_name="test-changes",
                     available=True,
                     supported_query_fields=["service", "limit"],
                 ),

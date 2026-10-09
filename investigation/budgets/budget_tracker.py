@@ -311,7 +311,7 @@ class BudgetTracker:
             code=BUDGET_EXHAUSTED,
             message=message,
             retryable=False,
-            source="investigation.budgets.budget_tracker",
+            stage="budget_tracking",
             details={
                 "exhausted_limits": self.get_exhausted_limits(),
                 "used": {
