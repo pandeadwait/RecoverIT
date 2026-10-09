@@ -23,7 +23,13 @@ from collectors.fixtures import (
     resolve_scenario_name,
 )
 from contracts.errors.schemas import ProgressEvent
-from recoverit.runner import InvestigationResult, InvestigationRunner
+from contracts.incident.schemas import IncidentSeed
+from contracts.investigation.schemas import InvestigationBudget
+from recoverit.runner import (
+    InvestigationResult,
+    InvestigationRunner,
+    LangGraphInvestigationRunner,
+)
 
 if sys.platform == "win32":
     try:
@@ -486,6 +492,30 @@ async def run_scenario_flow(
         reveal_ground_truth=reveal_ground_truth,
         scenario_name=scenario,
     )
+
+
+async def run_live_investigation_flow(
+    runner: LangGraphInvestigationRunner,
+    incident: IncidentSeed,
+    budget: InvestigationBudget | None = None,
+    report: str | None = None,
+) -> InvestigationResult:
+    """Run one canonical incident through the graph-backed live runtime.
+
+    Runtime composition remains outside the CLI so source credentials, clients,
+    and benchmark fixtures can never be inferred from a command-line request.
+    """
+
+    render_banner()
+    render_trace_header()
+    trace = CLITraceRenderer()
+    result = await runner.run(
+        incident=incident,
+        budget=budget,
+        progress_callback=trace,
+    )
+    display_results(result, report_path=report)
+    return result
 
 
 async def run_benchmark_flow(
