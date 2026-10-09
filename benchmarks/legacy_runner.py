@@ -1,4 +1,8 @@
-"""Unified Investigation Runner orchestrating the complete incident investigation flow."""
+"""BENCHMARK-ONLY legacy investigation runner.
+
+This scenario/replay runner is retained for benchmark compatibility and is not
+part of the configured live LangGraph runtime.
+"""
 
 from __future__ import annotations
 

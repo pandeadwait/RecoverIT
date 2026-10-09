@@ -1,10 +1,7 @@
-"""
-Investigation state machine implementation.
+"""BENCHMARK-ONLY pre-LangGraph investigation state machine.
 
-Enforces the bounded investigation workflow engine, legal transitions,
-monotonically increasing state versions, and external call checkpointing.
-
-See ARCHITECTURE.md §9 and WORK_DIVISION.md §8.2.
+The configured live runtime uses LangGraph checkpointing and routing. This
+state machine remains only for the legacy benchmark runner and tests.
 """
 
 from __future__ import annotations

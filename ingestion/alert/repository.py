@@ -1,4 +1,4 @@
-"""Incident repository abstraction and in-memory implementation."""
+"""TEST-ONLY incident repository abstraction and in-memory implementation."""
 
 from __future__ import annotations
 

@@ -1,4 +1,8 @@
-"""Alert ingestion service converting validated alerts into IncidentSeed records."""
+"""TEST-ONLY legacy alert-ingestion service.
+
+The configured live entry point accepts a validated ``IncidentSeed`` directly.
+This service remains for contract and legacy integration tests.
+"""
 
 from __future__ import annotations
 

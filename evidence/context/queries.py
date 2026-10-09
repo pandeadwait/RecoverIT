@@ -1,4 +1,4 @@
-"""Database-agnostic context and evidence reads exposed to Person 3."""
+"""TEST-ONLY context/evidence read contracts exposed to Person 3."""
 
 from __future__ import annotations
 

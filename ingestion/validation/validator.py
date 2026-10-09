@@ -1,4 +1,4 @@
-"""Validation logic for raw incoming alert payloads."""
+"""TEST-ONLY validation for the legacy external-alert ingestion boundary."""
 
 from __future__ import annotations
 

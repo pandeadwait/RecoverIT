@@ -1,14 +1,7 @@
-"""
-Investigation orchestration loop implementation.
+"""BENCHMARK-ONLY pre-LangGraph investigation orchestration.
 
-Coordinates the bounded investigation workflow across missing-information analysis,
-query planning, collection abstractions, context-building abstractions, hypothesis
-generation and revision, citation validation, stopping rules, and deterministic ranking.
-
-Boundary Rule: The orchestrator stops at producing a RankedHypothesisSet.
-No remediation, actions, or self-healing paths exist.
-
-See WORK_DIVISION.md §8.8, §8.9 and ARCHITECTURE.md §9.
+The configured live runtime uses ``investigation.graph``. This loop remains for
+the legacy scenario benchmark runner and compatibility tests.
 """
 
 from __future__ import annotations

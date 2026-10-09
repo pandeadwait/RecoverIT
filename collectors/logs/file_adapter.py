@@ -1,4 +1,7 @@
-"""File-based log source adapter for live application log inspection.
+"""BENCHMARK-ONLY legacy file-log adapter.
+
+The configured live runtime uses ``collectors.logs.file``. This older
+synchronous adapter remains only for the legacy benchmark runner.
 
 Implements LogSource to collect real application logs from local files on disk,
 supporting both structured JSON lines and standard formatted text logs.

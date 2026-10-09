@@ -1,4 +1,7 @@
-"""Local Git repository change adapter for live codebase inspection.
+"""BENCHMARK-ONLY legacy Local Git adapter.
+
+The configured live runtime uses ``collectors.changes.local_git``. This older
+synchronous adapter remains only for the legacy benchmark runner.
 
 Implements ChangeSource to collect real git commits, metadata, and diffs
 from a local git repository on disk.

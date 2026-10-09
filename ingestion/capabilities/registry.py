@@ -1,4 +1,7 @@
-"""Source capability discovery and registry.
+"""BENCHMARK-ONLY legacy capability registry.
+
+The configured live runtime uses ``collectors.registry.SourceRegistry``. This
+compatibility registry remains for benchmark scenarios and their tests.
 
 Implements SourceRegistry per WORK_DIVISION §6.6 and §6.8, dynamically producing
 the SourceCapabilityCatalog for an incident.

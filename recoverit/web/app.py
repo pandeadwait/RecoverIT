@@ -1,4 +1,4 @@
-"""Legacy scenario dashboard retained only for benchmark demonstration.
+"""BENCHMARK-ONLY legacy scenario dashboard.
 
 Production serving uses :mod:`recoverit.web.configured`, which requires a
 configured fixture-free LangGraph runtime.

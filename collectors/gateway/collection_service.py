@@ -1,4 +1,7 @@
-"""Collection service coordinating multi-source evidence query execution.
+"""BENCHMARK-ONLY legacy collection service.
+
+The configured live runtime uses ``collectors.service.DefaultCollectionService``.
+This synchronous implementation remains for the legacy benchmark stack.
 
 Per WORK_DIVISION §6.2, §6.6, §6.7, and §6.8, CollectionService executes an
 EvidenceQueryPlan against registered source adapters and produces a RawEvidenceBatch.

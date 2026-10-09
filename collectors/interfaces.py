@@ -1,4 +1,7 @@
-"""Abstract interfaces for operational data sources.
+"""BENCHMARK-ONLY legacy source interfaces.
+
+The configured live runtime uses ``collectors.base`` and canonical collection
+contracts. These interfaces remain for the legacy benchmark stack.
 
 Per WORK_DIVISION §6.6 and §6.8, all operational data sources are accessed
 through source-neutral interfaces returning typed results.

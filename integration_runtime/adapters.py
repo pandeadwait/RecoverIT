@@ -1,4 +1,8 @@
-"""Async boundary adapters for the merged Person 1, 2, and 3 implementations."""
+"""BENCHMARK-ONLY schema-translation adapters.
+
+The configured live LangGraph runtime uses canonical contracts directly. These
+adapters bridge pre-migration schemas for the legacy runner and its tests.
+"""
 
 from __future__ import annotations
 

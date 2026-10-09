@@ -1,10 +1,6 @@
-"""
-Recorded reasoning provider for deterministic replay testing.
+"""TEST-ONLY deterministic recorded reasoning provider.
 
-Replays pre-recorded responses from fixture files or memory dictionaries.
-Guarantees identical behavior across test runs without external dependencies.
-
-See WORK_DIVISION.md §8.7 and ARCHITECTURE.md §8.
+It replays fixture responses and is not a valid live reasoning provider.
 """
 
 from __future__ import annotations
