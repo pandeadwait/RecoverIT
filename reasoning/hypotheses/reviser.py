@@ -51,6 +51,8 @@ class HypothesisReviser:
         self,
         previous_hypotheses: HypothesisSet,
         new_context: IncidentContextSnapshot,
+        incident: Any = None,
+        assessment: Any = None,
     ) -> HypothesisSet:
         """
         Produce a revised HypothesisSet reflecting newly gathered evidence.
@@ -157,6 +159,7 @@ class HypothesisReviser:
 
         return HypothesisSet(
             incident_id=previous_hypotheses.incident_id,
+            revision=previous_hypotheses.revision + 1,
             hypotheses=deduplicated_hypotheses,
             generated_at=datetime.now(timezone.utc),
         )
