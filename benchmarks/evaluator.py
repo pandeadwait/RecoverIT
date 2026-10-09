@@ -19,6 +19,7 @@ from collectors.fixtures.data_loader import (
     load_scenario_json,
     resolve_scenario_name,
 )
+from benchmarks.legacy_runner import InvestigationRunner as BenchmarkRunner
 from recoverit.runner import InvestigationResult
 
 logger = logging.getLogger(__name__)
@@ -232,10 +233,8 @@ class BenchmarkEvaluator:
         llm_model: str | None = None,
     ) -> list[BenchmarkEvaluationResult]:
         """Run investigations across a suite of scenarios and evaluate all outcomes."""
-        from recoverit.runner import InvestigationRunner
-
         suite_scenarios = scenarios or list(CANONICAL_SCENARIOS)
-        runner = InvestigationRunner()
+        runner = BenchmarkRunner()
         results: list[BenchmarkEvaluationResult] = []
 
         for scenario in suite_scenarios:

@@ -18,7 +18,7 @@ from collectors.fixtures import (
     load_scenario_json,
     resolve_scenario_name,
 )
-from recoverit.runner import InvestigationRunner
+from benchmarks.legacy_runner import InvestigationRunner as BenchmarkRunner
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -36,7 +36,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-runner = InvestigationRunner()
+runner = BenchmarkRunner()
 
 SCENARIO_METADATA = {
     "incident_001": {

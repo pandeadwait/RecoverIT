@@ -52,7 +52,7 @@ from investigation.orchestration.orchestrator import (
     StoppingDecision,
     StoppingRuleEvaluator,
 )
-from recoverit.runner import InvestigationRunner
+from benchmarks.legacy_runner import InvestigationRunner
 
 
 # ---------------------------------------------------------------------------

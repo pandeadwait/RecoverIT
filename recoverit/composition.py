@@ -35,6 +35,10 @@ class RuntimeMode(StrEnum):
     TEST = "test"
 
 
+class RuntimeConfigurationError(ValueError):
+    """Raised when a live runtime cannot be assembled safely."""
+
+
 class SourceAdapterConfig(BaseModel):
     """Configuration for one registered, server-side source adapter."""
 
@@ -111,17 +115,24 @@ class RuntimeContainer:
 def build_runtime(
     settings: RuntimeSettings,
     *,
-    registry: CapabilityRegistry,
-    dependencies: GraphDependencies,
+    registry: CapabilityRegistry | None = None,
+    dependencies: GraphDependencies | None = None,
 ) -> RuntimeContainer:
     """Compile the graph with the selected durable checkpoint backend.
 
-    Concrete collector and reasoning services are supplied by their owners and
-    injected through ``GraphDependencies``.  This keeps this composition root
-    generic and prevents benchmark fixtures from entering live runtime code.
+    Tests may inject a registry and dependencies directly.  Live composition
+    builds only configured read-only adapters and requires a real LLM client;
+    it never substitutes fixtures, scripted providers, or scenario presets.
     """
 
     dispatcher = ProgressDispatcher()
+    if registry is None or dependencies is None:
+        if settings.mode is not RuntimeMode.LIVE:
+            raise RuntimeConfigurationError(
+                "Only live runtimes may be assembled automatically. "
+                "Tests and benchmarks must inject their dependencies explicitly."
+            )
+        registry, dependencies = _build_live_dependencies(settings, dispatcher)
     if settings.mode is RuntimeMode.TEST:
         checkpointer: BaseCheckpointSaver = InMemorySaver()
         checkpoint_context: AbstractContextManager[BaseCheckpointSaver] | None = None
@@ -154,9 +165,106 @@ def build_runtime(
     )
 
 
+def _build_live_dependencies(
+    settings: RuntimeSettings,
+    dispatcher: ProgressDispatcher,
+) -> tuple[CapabilityRegistry, GraphDependencies]:
+    """Compose real adapters and services without importing benchmark code."""
+
+    from collectors.registry import SourceRegistry
+    from collectors.service import DefaultCollectionService, SystemClock
+    from evidence.context.builder import DefaultContextBuilder
+    from investigation.missing_information.assessor import MissingInformationAssessor
+    from investigation.query_planning.planner import EvidenceQueryPlanner
+    from reasoning.hypotheses.service import DefaultHypothesisService
+    from reasoning.provider.clients import create_llm_client
+    from reasoning.provider.llm_provider import LLMReasoningProvider
+    from reasoning.ranking.ranking_engine import RankingEngine
+    from reasoning.stopping import DefaultStoppingService
+
+    client = create_llm_client(
+        provider_name=settings.llm_provider,
+        model=settings.llm_model if settings.llm_model != "unconfigured" else None,
+    )
+    if client is None:
+        raise RuntimeConfigurationError(
+            "No live LLM client is configured. Set llm_provider/llm_model and the "
+            "corresponding credentials; live investigations never use a fixture "
+            "or scripted reasoning provider."
+        )
+
+    registry = SourceRegistry(_build_source_adapters(settings.source_configs))
+    clock = SystemClock()
+    provider = LLMReasoningProvider(
+        client=client,
+        provider_name=settings.llm_provider,
+        model=getattr(client, "model", settings.llm_model),
+    )
+    ranking = RankingEngine()
+    dependencies = GraphDependencies(
+        collection_service=DefaultCollectionService(
+            registry=registry,
+            clock=clock,
+            max_concurrency=settings.max_concurrency,
+            query_timeout_seconds=settings.query_timeout_seconds,
+        ),
+        context_builder=DefaultContextBuilder(),
+        missing_information_service=MissingInformationAssessor(provider),
+        query_planning_service=EvidenceQueryPlanner(provider),
+        hypothesis_service=DefaultHypothesisService(provider),
+        stopping_service=DefaultStoppingService(ranking_engine=ranking),
+        ranking_service=ranking,
+        progress_sink=dispatcher,
+        clock=clock,
+    )
+    return registry, dependencies
+
+
+def _build_source_adapters(configs: list[SourceAdapterConfig]) -> list[object]:
+    """Instantiate allowlisted source adapters from trusted runtime settings."""
+
+    from collectors.changes.local_git import LocalGitChangeAdapter
+    from collectors.configuration.git_configuration import GitConfigurationAdapter
+    from collectors.deployments.kubernetes import KubernetesDeploymentAdapter
+    from collectors.health.http_health import HttpHealthAdapter
+    from collectors.logs.file import FileLogAdapter
+    from collectors.metrics.prometheus import PrometheusMetricAdapter
+    from collectors.pipelines.github_actions import GitHubActionsPipelineAdapter
+
+    factories: dict[str, type[object]] = {
+        "local_git": LocalGitChangeAdapter,
+        "file_log": FileLogAdapter,
+        "prometheus": PrometheusMetricAdapter,
+        "github_actions": GitHubActionsPipelineAdapter,
+        "kubernetes": KubernetesDeploymentAdapter,
+        "git_configuration": GitConfigurationAdapter,
+        "http_health": HttpHealthAdapter,
+    }
+    adapters: list[object] = []
+    for config in configs:
+        if not config.enabled:
+            continue
+        factory = factories.get(config.implementation)
+        if factory is None:
+            allowed = ", ".join(sorted(factories))
+            raise RuntimeConfigurationError(
+                f"Unsupported source implementation '{config.implementation}'. "
+                f"Allowed values: {allowed}."
+            )
+        adapter = factory(**config.options)
+        if getattr(adapter, "source_type", None) != config.source_type:
+            raise RuntimeConfigurationError(
+                f"Adapter '{config.implementation}' does not implement source type "
+                f"'{config.source_type.value}'."
+            )
+        adapters.append(adapter)
+    return adapters
+
+
 __all__ = [
     "CapabilityRegistry",
     "ProgressDispatcher",
+    "RuntimeConfigurationError",
     "RuntimeContainer",
     "RuntimeMode",
     "RuntimeSettings",

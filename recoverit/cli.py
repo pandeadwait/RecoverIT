@@ -22,6 +22,7 @@ from collectors.fixtures import (
     load_scenario_json,
     resolve_scenario_name,
 )
+from benchmarks.legacy_runner import InvestigationRunner as BenchmarkRunner
 from contracts.errors.schemas import ProgressEvent
 from contracts.incident.schemas import IncidentSeed
 from contracts.investigation.schemas import InvestigationBudget
@@ -467,7 +468,7 @@ async def run_scenario_flow(
     report: str | None,
     reveal_ground_truth: bool = False,
 ) -> None:
-    runner = InvestigationRunner()
+    runner = BenchmarkRunner()
     render_banner()
     render_trace_header()
     trace = CLITraceRenderer()
@@ -624,7 +625,7 @@ async def scan_repo_flow(
     summary: str,
     report: str | None,
 ) -> None:
-    runner = InvestigationRunner()
+    runner = BenchmarkRunner()
     render_banner()
 
     repo_path = Path(repo).resolve()

@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from recoverit.runner import InvestigationRunner
+from benchmarks.legacy_runner import InvestigationRunner
 
 
 class TestInvestigationRunner(unittest.IsolatedAsyncioTestCase):
