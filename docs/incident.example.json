@@ -1,0 +1,13 @@
+{
+  "incident_id": "inc-live-example-001",
+  "external_alert_id": "alert-live-example-001",
+  "service": "example-service",
+  "environment": "production",
+  "severity": "critical",
+  "detected_at": "2026-10-09T10:00:00+00:00",
+  "received_at": "2026-10-09T10:00:10+00:00",
+  "summary": "Elevated HTTP 500 rate detected after a deployment.",
+  "labels": {
+    "alertname": "HighErrorRate"
+  }
+}

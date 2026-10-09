@@ -11,6 +11,7 @@ from contextlib import AbstractContextManager, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from enum import StrEnum
+import json
 from pathlib import Path
 from typing import Any, Callable, Iterator, Protocol
 
@@ -18,7 +19,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph.state import CompiledStateGraph
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from contracts.collection.schemas import SourceCapabilityCatalog
 from contracts.enums import SourceType
@@ -58,6 +59,39 @@ class RuntimeSettings(BaseModel):
     max_concurrency: int = Field(default=4, ge=1)
     query_timeout_seconds: float = Field(default=10.0, gt=0)
     source_configs: list[SourceAdapterConfig] = Field(default_factory=list)
+
+
+def load_runtime_settings(path: str | Path) -> RuntimeSettings:
+    """Load and validate the trusted JSON configuration for a live runtime.
+
+    Configuration is deliberately file-based rather than inferred from CLI
+    flags, environment heuristics, fixtures, or scenario names.  Secrets stay
+    in the provider's normal credential mechanism; this file contains only the
+    selected adapter and model settings.
+    """
+
+    config_path = Path(path)
+    try:
+        payload = json.loads(config_path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise RuntimeConfigurationError(
+            f"Could not read runtime configuration '{config_path}': {exc}"
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise RuntimeConfigurationError(
+            f"Runtime configuration '{config_path}' is not valid JSON: {exc.msg}."
+        ) from exc
+
+    if not isinstance(payload, dict):
+        raise RuntimeConfigurationError(
+            f"Runtime configuration '{config_path}' must contain a JSON object."
+        )
+    try:
+        return RuntimeSettings.model_validate(payload)
+    except ValidationError as exc:
+        raise RuntimeConfigurationError(
+            f"Runtime configuration '{config_path}' does not match RuntimeSettings: {exc}"
+        ) from exc
 
 
 class CapabilityRegistry(Protocol):
@@ -270,4 +304,5 @@ __all__ = [
     "RuntimeSettings",
     "SourceAdapterConfig",
     "build_runtime",
+    "load_runtime_settings",
 ]

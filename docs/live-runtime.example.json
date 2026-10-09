@@ -1,0 +1,18 @@
+{
+  "mode": "live",
+  "checkpoint_database_path": ".recoverit/checkpoints.sqlite",
+  "llm_provider": "openai",
+  "llm_model": "gpt-4o-mini",
+  "max_concurrency": 4,
+  "query_timeout_seconds": 10.0,
+  "source_configs": [
+    {
+      "source_type": "changes",
+      "implementation": "local_git",
+      "enabled": true,
+      "options": {
+        "repo_path": "."
+      }
+    }
+  ]
+}

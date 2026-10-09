@@ -1,4 +1,4 @@
-"""Web dashboard server launcher for RecoverIT."""
+"""Configured production server launcher for RecoverIT's LangGraph API."""
 
 from __future__ import annotations
 
@@ -9,6 +9,9 @@ import time
 import webbrowser
 
 import uvicorn
+
+from recoverit.composition import RuntimeSettings, load_runtime_settings
+from recoverit.web.configured import create_configured_app
 
 
 def is_port_in_use(port: int, host: str = "127.0.0.1") -> bool:
@@ -24,7 +27,12 @@ def open_browser_delayed(url: str, delay: float = 1.0) -> None:
         pass
 
 
-def start_server(host: str = "127.0.0.1", port: int = 8000, open_browser: bool = True) -> None:
+def start_server(
+    settings: RuntimeSettings,
+    host: str = "127.0.0.1",
+    port: int = 8000,
+    open_browser: bool = True,
+) -> None:
     # Find free port if 8000 is occupied
     actual_port = port
     while is_port_in_use(actual_port, host) and actual_port < port + 20:
@@ -32,7 +40,7 @@ def start_server(host: str = "127.0.0.1", port: int = 8000, open_browser: bool =
 
     url = f"http://{host}:{actual_port}"
     print("\n" + "=" * 62)
-    print("  RecoverIT — Web Incident Investigation Dashboard")
+    print("  RecoverIT — Live LangGraph Investigation API")
     print(f"  Server URL:  {url}")
     print("  Press Ctrl+C to stop the server.")
     print("=" * 62 + "\n")
@@ -40,17 +48,27 @@ def start_server(host: str = "127.0.0.1", port: int = 8000, open_browser: bool =
     if open_browser:
         threading.Thread(target=open_browser_delayed, args=(url, 1.2), daemon=True).start()
 
-    uvicorn.run("recoverit.web.app:app", host=host, port=actual_port, log_level="info")
+    uvicorn.run(create_configured_app(settings), host=host, port=actual_port, log_level="info")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Launch RecoverIT Web Dashboard")
+    parser = argparse.ArgumentParser(description="Launch RecoverIT's live LangGraph API")
+    parser.add_argument(
+        "--config",
+        required=True,
+        help="Path to the validated live runtime JSON configuration",
+    )
     parser.add_argument("--host", default="127.0.0.1", help="Host interface (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8000, help="Port to listen on (default: 8000)")
     parser.add_argument("--no-browser", action="store_true", help="Do not open browser automatically")
 
     args = parser.parse_args()
-    start_server(host=args.host, port=args.port, open_browser=not args.no_browser)
+    start_server(
+        load_runtime_settings(args.config),
+        host=args.host,
+        port=args.port,
+        open_browser=not args.no_browser,
+    )
 
 
 if __name__ == "__main__":

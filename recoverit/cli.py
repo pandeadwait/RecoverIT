@@ -10,6 +10,7 @@ import argparse
 import asyncio
 from pathlib import Path
 import sys
+from typing import Any
 
 from rich.console import Console
 from rich.padding import Padding
@@ -26,10 +27,14 @@ from benchmarks.legacy_runner import InvestigationRunner as BenchmarkRunner
 from contracts.errors.schemas import ProgressEvent
 from contracts.incident.schemas import IncidentSeed
 from contracts.investigation.schemas import InvestigationBudget
+from recoverit.composition import (
+    RuntimeConfigurationError,
+    build_runtime,
+    load_runtime_settings,
+)
 from recoverit.runner import (
     InvestigationResult,
     InvestigationRunner,
-    LangGraphInvestigationRunner,
 )
 
 if sys.platform == "win32":
@@ -496,7 +501,7 @@ async def run_scenario_flow(
 
 
 async def run_live_investigation_flow(
-    runner: LangGraphInvestigationRunner,
+    runner: InvestigationRunner,
     incident: IncidentSeed,
     budget: InvestigationBudget | None = None,
     report: str | None = None,
@@ -517,6 +522,41 @@ async def run_live_investigation_flow(
     )
     display_results(result, report_path=report)
     return result
+
+
+def load_incident_seed(path: str | Path) -> IncidentSeed:
+    """Load one generic, externally supplied incident request from JSON."""
+
+    incident_path = Path(path)
+    try:
+        return IncidentSeed.model_validate_json(incident_path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise RuntimeConfigurationError(
+            f"Could not read incident file '{incident_path}': {exc}"
+        ) from exc
+    except ValueError as exc:
+        raise RuntimeConfigurationError(
+            f"Incident file '{incident_path}' does not match IncidentSeed: {exc}"
+        ) from exc
+
+
+async def investigate_flow(
+    config_path: str,
+    incident_path: str,
+    report: str | None,
+) -> InvestigationResult:
+    """Run the configured production runtime without scenario assumptions."""
+
+    settings = load_runtime_settings(config_path)
+    runtime = build_runtime(settings)
+    try:
+        return await run_live_investigation_flow(
+            InvestigationRunner(runtime),
+            load_incident_seed(incident_path),
+            report=report,
+        )
+    finally:
+        runtime.close()
 
 
 async def run_benchmark_flow(
@@ -662,11 +702,31 @@ def main() -> None:
     )
     subparsers = parser.add_subparsers(dest="command", help="Available subcommands")
 
-    # list command
-    subparsers.add_parser("list", help="List available incident benchmark scenarios")
+    # Benchmark-only commands are retained for evaluation, not production use.
+    subparsers.add_parser("list", help="List available benchmark scenarios")
+
+    investigate_parser = subparsers.add_parser(
+        "investigate",
+        help="Run a configured live LangGraph investigation from an IncidentSeed JSON file",
+    )
+    investigate_parser.add_argument(
+        "--config",
+        required=True,
+        help="Path to the validated live runtime JSON configuration",
+    )
+    investigate_parser.add_argument(
+        "--incident",
+        required=True,
+        help="Path to a JSON file matching the IncidentSeed contract",
+    )
+    investigate_parser.add_argument(
+        "--report",
+        "-r",
+        help="Optional file path to save the Markdown post-mortem report",
+    )
 
     # run command
-    run_parser = subparsers.add_parser("run", help="Run incident investigation on a scenario")
+    run_parser = subparsers.add_parser("run", help="Run a benchmark scenario (legacy evaluation path)")
     run_parser.add_argument(
         "--scenario",
         "-s",
@@ -734,7 +794,7 @@ def main() -> None:
     )
 
     # scan command
-    scan_parser = subparsers.add_parser("scan", help="Scan a local Git repository and log file")
+    scan_parser = subparsers.add_parser("scan", help="Scan a local repository (legacy benchmark path)")
     scan_parser.add_argument(
         "--repo",
         "-p",
@@ -782,53 +842,65 @@ def main() -> None:
     )
 
     # ui / serve command
-    ui_parser = subparsers.add_parser("ui", help="Launch the interactive Web Dashboard")
+    ui_parser = subparsers.add_parser("ui", help="Launch the configured live LangGraph API")
+    ui_parser.add_argument(
+        "--config",
+        required=True,
+        help="Path to the validated live runtime JSON configuration",
+    )
     ui_parser.add_argument("--port", type=int, default=8000, help="Port to listen on (default: 8000)")
     ui_parser.add_argument("--host", default="127.0.0.1", help="Host interface (default: 127.0.0.1)")
 
     args = parser.parse_args()
 
-    if args.command == "list":
-        list_command(args)
-    elif args.command == "run":
-        asyncio.run(
-            run_scenario_flow(
-                args.scenario,
-                args.mode,
-                args.provider,
-                args.model,
-                args.report,
-                reveal_ground_truth=getattr(args, "reveal_ground_truth", False),
+    try:
+        if args.command == "list":
+            list_command(args)
+        elif args.command == "investigate":
+            asyncio.run(investigate_flow(args.config, args.incident, args.report))
+        elif args.command == "run":
+            asyncio.run(
+                run_scenario_flow(
+                    args.scenario,
+                    args.mode,
+                    args.provider,
+                    args.model,
+                    args.report,
+                    reveal_ground_truth=getattr(args, "reveal_ground_truth", False),
+                )
             )
-        )
-    elif args.command == "benchmark":
-        asyncio.run(
-            run_benchmark_flow(
-                args.scenarios,
-                args.mode,
-                args.provider,
-                args.model,
-                args.report,
+        elif args.command == "benchmark":
+            asyncio.run(
+                run_benchmark_flow(
+                    args.scenarios,
+                    args.mode,
+                    args.provider,
+                    args.model,
+                    args.report,
+                )
             )
-        )
-    elif args.command == "scan":
-        asyncio.run(
-            scan_repo_flow(
-                args.repo,
-                args.logs,
-                args.service,
-                args.mode,
-                args.provider,
-                args.model,
-                args.summary,
-                args.report,
+        elif args.command == "scan":
+            asyncio.run(
+                scan_repo_flow(
+                    args.repo,
+                    args.logs,
+                    args.service,
+                    args.mode,
+                    args.provider,
+                    args.model,
+                    args.summary,
+                    args.report,
+                )
             )
-        )
-    elif args.command == "ui":
-        from recoverit.serve import start_server
-        start_server(host=args.host, port=args.port)
-    else:
-        parser.print_help()
+        elif args.command == "ui":
+            from recoverit.serve import start_server
+
+            start_server(load_runtime_settings(args.config), host=args.host, port=args.port)
+        else:
+            parser.print_help()
+    except RuntimeConfigurationError as exc:
+        console.print(f"[bold color(167)]Configuration error:[/bold color(167)] {exc}")
+        raise SystemExit(2) from exc
 
 
 if __name__ == "__main__":

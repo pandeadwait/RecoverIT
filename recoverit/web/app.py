@@ -1,4 +1,8 @@
-"""FastAPI backend application for the RecoverIT Incident Cockpit."""
+"""Legacy scenario dashboard retained only for benchmark demonstration.
+
+Production serving uses :mod:`recoverit.web.configured`, which requires a
+configured fixture-free LangGraph runtime.
+"""
 
 from __future__ import annotations
 

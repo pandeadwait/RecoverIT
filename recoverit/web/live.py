@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import asdict
 import json
-from typing import AsyncIterator, Callable, Protocol
+from typing import AsyncContextManager, AsyncIterator, Callable, Protocol
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
@@ -49,14 +49,29 @@ def result_payload(result: InvestigationResult) -> dict[str, object]:
     return payload
 
 
-def create_live_app(executor: InvestigationExecutor) -> FastAPI:
+Lifespan = Callable[[FastAPI], AsyncContextManager[None]]
+
+
+def create_live_app(
+    executor: InvestigationExecutor,
+    *,
+    lifespan: Lifespan | None = None,
+) -> FastAPI:
     """Create a live API bound to a pre-composed, fixture-free runtime."""
 
     app = FastAPI(
         title="RecoverIT Live Investigation API",
         description="Incident investigation through the LangGraph runtime.",
         version="0.2.0",
+        lifespan=lifespan,
     )
+
+    @app.get("/")
+    async def index() -> dict[str, str]:
+        return {
+            "service": "RecoverIT Live Investigation API",
+            "documentation": "/docs",
+        }
 
     @app.get("/health")
     async def health() -> dict[str, str]:
