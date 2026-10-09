@@ -373,3 +373,20 @@ async def test_graph_runner_invokes_runtime_with_incident_thread_id() -> None:
     assert result.status == InvestigationStatus.COMPLETED
     assert snapshot.values["ranked_result"].incident_id == result.incident_id
     assert [event.stage for event in progress][-1] == "rank_hypotheses"
+
+
+@pytest.mark.asyncio
+async def test_graph_runner_reads_a_completed_checkpoint_by_incident_id() -> None:
+    runtime = build_runtime(
+        RuntimeSettings(mode=RuntimeMode.TEST),
+        registry=StaticCapabilityRegistry(),
+        dependencies=dependencies(),
+    )
+    runner = LangGraphInvestigationRunner(runtime)
+
+    initial = await runner.run(invocation_input()["incident"])
+    resumed = await runner.resume(initial.incident_id)
+
+    assert resumed.incident_id == initial.incident_id
+    assert resumed.status == InvestigationStatus.COMPLETED
+    assert resumed.ranked_hypotheses == initial.ranked_hypotheses

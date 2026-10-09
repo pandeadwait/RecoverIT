@@ -22,6 +22,7 @@ from collectors.fixtures import (
     load_scenario_json,
     resolve_scenario_name,
 )
+from contracts.errors.schemas import ProgressEvent
 from recoverit.runner import InvestigationResult, InvestigationRunner
 
 if sys.platform == "win32":
@@ -59,7 +60,11 @@ class CLITraceRenderer:
         self.event_count = 0
         self.trace_steps: list[dict[str, Any]] = []
 
-    def __call__(self, event: dict[str, object]) -> None:
+    def __call__(self, event: ProgressEvent | dict[str, object]) -> None:
+        """Render both typed LangGraph events and legacy dictionary events."""
+
+        if isinstance(event, ProgressEvent):
+            event = event.model_dump(mode="json")
         self.event_count += 1
         kind = str(event.get("kind", "status"))
 
