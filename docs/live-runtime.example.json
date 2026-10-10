@@ -3,6 +3,8 @@
   "checkpoint_database_path": ".recoverit/checkpoints.sqlite",
   "llm_provider": "openai",
   "llm_model": "gpt-4o-mini",
+  "llm_timeout_seconds": 180.0,
+  "llm_max_output_tokens": 4096,
   "max_concurrency": 4,
   "query_timeout_seconds": 10.0,
   "source_configs": [

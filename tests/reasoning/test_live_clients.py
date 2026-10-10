@@ -36,6 +36,33 @@ class _AsyncClient:
         return _Response()
 
 
+class _GeminiResponse:
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self) -> dict:
+        return {
+            "candidates": [{"content": {"parts": [{"text": '{"ok": true}'}]}}],
+            "usageMetadata": {"promptTokenCount": 2, "candidatesTokenCount": 3},
+        }
+
+
+class _GeminiAsyncClient:
+    def __init__(self, captured: dict, **kwargs) -> None:
+        self._captured = captured
+        self._captured["client_kwargs"] = kwargs
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, traceback) -> None:
+        return None
+
+    async def post(self, url: str, **kwargs):
+        self._captured.update(url=url, **kwargs)
+        return _GeminiResponse()
+
+
 @pytest.mark.asyncio
 async def test_ollama_request_disables_reasoning_and_bounds_output(monkeypatch) -> None:
     captured: dict = {}
@@ -57,6 +84,28 @@ async def test_ollama_request_disables_reasoning_and_bounds_output(monkeypatch) 
     assert json.loads(response.content) == {"ok": True}
     assert captured["payload"]["reasoning_effort"] == "none"
     assert captured["payload"]["max_tokens"] == 1536
+
+
+@pytest.mark.asyncio
+async def test_gemini_request_uses_configured_timeout_and_output_limit(monkeypatch) -> None:
+    captured: dict = {}
+    monkeypatch.setattr(
+        clients.httpx,
+        "AsyncClient",
+        lambda **kwargs: _GeminiAsyncClient(captured, **kwargs),
+    )
+    client = clients.GeminiClient(
+        api_key="test-key",
+        model="gemini-3.8-flash",
+        timeout=180.0,
+        max_output_tokens=4096,
+    )
+
+    response = await client.complete("return JSON")
+
+    assert json.loads(response.content) == {"ok": True}
+    assert captured["client_kwargs"]["timeout"] == 180.0
+    assert captured["json"]["generationConfig"]["maxOutputTokens"] == 4096
 
 
 def test_ollama_factory_selects_an_installed_model(monkeypatch) -> None:

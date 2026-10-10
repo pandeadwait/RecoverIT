@@ -109,6 +109,7 @@ class GeminiClient(LLMClient):
         api_key: str | None = None,
         model: str = "gemini-3.5-flash-lite",
         timeout: float = 60.0,
+        max_output_tokens: int | None = None,
     ) -> None:
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "")
         model_aliases = {
@@ -123,6 +124,7 @@ class GeminiClient(LLMClient):
         raw_model = model or "gemini-3.5-flash-lite"
         self.model = model_aliases.get(raw_model, raw_model)
         self.timeout = timeout
+        self.max_output_tokens = max_output_tokens
         self.base_url = "https://generativelanguage.googleapis.com/v1beta"
 
     async def complete(
@@ -139,6 +141,8 @@ class GeminiClient(LLMClient):
             "temperature": temperature,
             "responseMimeType": "application/json",
         }
+        if self.max_output_tokens is not None:
+            generation_config["maxOutputTokens"] = self.max_output_tokens
 
         effective_system = system_instruction or ""
         if json_schema:
@@ -221,6 +225,8 @@ def create_llm_client(
     api_key: str | None = None,
     model: str | None = None,
     base_url: str | None = None,
+    timeout: float = 60.0,
+    max_output_tokens: int | None = None,
 ) -> LLMClient | None:
     """
     Factory creating the appropriate LLMClient based on settings and environment.
@@ -236,13 +242,23 @@ def create_llm_client(
         key = api_key or os.environ.get("GEMINI_API_KEY")
         if not key:
             return None
-        return GeminiClient(api_key=key, model=model or "gemini-1.5-flash")
+        return GeminiClient(
+            api_key=key,
+            model=model or "gemini-1.5-flash",
+            timeout=timeout,
+            max_output_tokens=max_output_tokens,
+        )
 
     if prov == "openai":
         key = api_key or os.environ.get("OPENAI_API_KEY")
         if not key:
             return None
-        return OpenAICompatibleClient(api_key=key, model=model or "gpt-4o-mini")
+        return OpenAICompatibleClient(
+            api_key=key,
+            model=model or "gpt-4o-mini",
+            timeout=timeout,
+            max_tokens=max_output_tokens,
+        )
 
     if prov == "ollama":
         ollama_root = _ollama_api_root(base_url)
@@ -259,19 +275,27 @@ def create_llm_client(
             api_key="ollama",
             base_url=f"{ollama_root}/v1",
             model=selected_model,
-            timeout=90.0,
+            timeout=timeout,
             reasoning_effort="none",
-            max_tokens=1536,
+            max_tokens=max_output_tokens or 1536,
         )
 
     # Auto-detection priority:
     # 1. Cloud Gemini if API key set
     if os.environ.get("GEMINI_API_KEY"):
-        return GeminiClient(model=model or "gemini-1.5-flash")
+        return GeminiClient(
+            model=model or "gemini-1.5-flash",
+            timeout=timeout,
+            max_output_tokens=max_output_tokens,
+        )
 
     # 2. Cloud OpenAI if API key set
     if os.environ.get("OPENAI_API_KEY"):
-        return OpenAICompatibleClient(model=model or "gpt-4o-mini")
+        return OpenAICompatibleClient(
+            model=model or "gpt-4o-mini",
+            timeout=timeout,
+            max_tokens=max_output_tokens,
+        )
 
     # 3. Local Ollama if daemon is active
     ollama_root = _ollama_api_root()
@@ -288,9 +312,9 @@ def create_llm_client(
             api_key="ollama",
             base_url=f"{ollama_root}/v1",
             model=target_model,
-            timeout=90.0,
+            timeout=timeout,
             reasoning_effort="none",
-            max_tokens=1536,
+            max_tokens=max_output_tokens or 1536,
         )
 
     return None

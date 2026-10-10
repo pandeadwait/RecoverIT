@@ -56,6 +56,8 @@ class RuntimeSettings(BaseModel):
     checkpoint_database_path: Path | None = None
     llm_provider: str = "unconfigured"
     llm_model: str = "unconfigured"
+    llm_timeout_seconds: float = Field(default=180.0, gt=0)
+    llm_max_output_tokens: int = Field(default=4096, ge=256)
     max_concurrency: int = Field(default=4, ge=1)
     query_timeout_seconds: float = Field(default=10.0, gt=0)
     source_configs: list[SourceAdapterConfig] = Field(default_factory=list)
@@ -220,6 +222,8 @@ def _build_live_dependencies(
     client = create_llm_client(
         provider_name=settings.llm_provider,
         model=settings.llm_model if settings.llm_model != "unconfigured" else None,
+        timeout=settings.llm_timeout_seconds,
+        max_output_tokens=settings.llm_max_output_tokens,
     )
     if client is None:
         raise RuntimeConfigurationError(
