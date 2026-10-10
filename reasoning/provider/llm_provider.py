@@ -68,7 +68,7 @@ logger = logging.getLogger(__name__)
 
 # Prompt versions
 PROMPT_VERSION_ASSESS = "assess_missing_info:v1.0"
-PROMPT_VERSION_PLAN = "plan_queries:v1.0"
+PROMPT_VERSION_PLAN = "plan_queries:v1.1"
 PROMPT_VERSION_GENERATE = "generate_hypotheses:v1.0"
 PROMPT_VERSION_REVISE = "revise_hypotheses:v1.0"
 PROMPT_VERSION_SCHEMA_REPAIR = "schema_repair:v1.0"
@@ -404,10 +404,17 @@ class LLMReasoningProvider:
                     for start_key, end_key in time_pairs:
                         new_params.pop(start_key, None)
                         new_params.pop(end_key, None)
+                    # Incident detection is an observation point, not an upper
+                    # bound for evidence. Symptoms and automated logs often
+                    # arrive immediately after the alert. Keep the source's
+                    # maximum window, but center it on the detection time so
+                    # collection can establish both pre- and post-alert facts.
                     anchor = context.incident.detected_at.astimezone(timezone.utc)
-                    start = anchor - timedelta(seconds=cap.maximum_window_seconds)
+                    half_window = timedelta(seconds=cap.maximum_window_seconds / 2)
+                    start = anchor - half_window
+                    end = anchor + half_window
                     new_params[selected_pair[0]] = start.isoformat().replace("+00:00", "Z")
-                    new_params[selected_pair[1]] = anchor.isoformat().replace("+00:00", "Z")
+                    new_params[selected_pair[1]] = end.isoformat().replace("+00:00", "Z")
                 normalized_queries.append(q.model_copy(update={"parameters": new_params}))
             else:
                 normalized_queries.append(q)
@@ -723,7 +730,7 @@ class LLMReasoningProvider:
             f"Allowed query parameter fields for available sources:\n"
             f"{json.dumps(allowed_params, indent=2)}\n\n"
             "CRITICAL RULES:\n"
-            "1. Use the incident's exact service and detected_at timestamp.\n"
+            "1. Use the incident's exact service and center time ranges on detected_at; include both pre- and post-alert evidence.\n"
             "2. Every time range must be no larger than that source's maximum_window_seconds.\n"
             "3. Phrase query questions neutrally; do NOT assume a change or deployment is causal.\n"
             "4. Populate 'related_information_ids' and 'discriminates_hypothesis_ids' for every query.\n"

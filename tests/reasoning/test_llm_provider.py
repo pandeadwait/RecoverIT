@@ -233,7 +233,7 @@ def test_llm_provider_implements_reasoning_provider_protocol() -> None:
 
 
 @pytest.mark.asyncio
-async def test_llm_plan_is_anchored_and_clamped_to_source_capability(
+async def test_llm_plan_is_centered_and_clamped_to_source_capability(
     sample_incident: IncidentSeed,
     sample_context: IncidentContextSnapshot,
     sample_budget: InvestigationBudget,
@@ -296,7 +296,8 @@ async def test_llm_plan_is_anchored_and_clamped_to_source_capability(
     end = datetime.fromisoformat(params["until"].replace("Z", "+00:00"))
     assert params["service"] == sample_incident.service
     assert params["limit"] == 100
-    assert end == sample_incident.detected_at
+    assert start < sample_incident.detected_at < end
+    assert start + (end - start) / 2 == sample_incident.detected_at
     assert (end - start).total_seconds() == 604800
 
 
@@ -423,7 +424,7 @@ async def test_llm_provider_valid_structured_output_all_methods(
 
     responses = {
         "assess_missing_info:v1.0": mia_json,
-        "plan_queries:v1.0": plan_json,
+        "plan_queries:v1.1": plan_json,
         "generate_hypotheses:v1.0": hyp_json,
         "revise_hypotheses:v1.0": revised_json,
     }
@@ -700,7 +701,7 @@ async def test_llm_provider_end_to_end_orchestration_loop(
     client = MockLLMClient(
         responses={
             "assess_missing_info:v1.0": mia_json,
-            "plan_queries:v1.0": plan_json,
+            "plan_queries:v1.1": plan_json,
             "generate_hypotheses:v1.0": hyp_json,
         }
     )
