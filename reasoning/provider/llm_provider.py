@@ -52,6 +52,7 @@ from contracts.hypothesis.schemas import (
     EvidenceCitation,
     Hypothesis,
     HypothesisSet,
+    RankedHypothesisSet,
 )
 from contracts.incident.schemas import IncidentSeed
 from contracts.investigation.schemas import (
@@ -62,6 +63,7 @@ from contracts.investigation.schemas import (
     MissingInformationAssessment,
     MissingInformationItem,
 )
+from contracts.remediation.schemas import RemediationPlan
 from reasoning.provider.interface import ReasoningProvider
 
 logger = logging.getLogger(__name__)
@@ -71,6 +73,7 @@ PROMPT_VERSION_ASSESS = "assess_missing_info:v1.0"
 PROMPT_VERSION_PLAN = "plan_queries:v1.1"
 PROMPT_VERSION_GENERATE = "generate_hypotheses:v1.0"
 PROMPT_VERSION_REVISE = "revise_hypotheses:v1.0"
+PROMPT_VERSION_REMEDIATE = "generate_remediation:v1.0"
 PROMPT_VERSION_SCHEMA_REPAIR = "schema_repair:v1.0"
 
 # Schema version
@@ -486,6 +489,38 @@ class LLMReasoningProvider:
             target_model=HypothesisSet,
         )
 
+    async def generate_remediation(
+        self,
+        ranked: RankedHypothesisSet,
+        context: IncidentContextSnapshot,
+    ) -> RemediationPlan:
+        """
+        Generate a structured remediation plan based on ranked hypotheses and context.
+        """
+        prompt = self._build_remediation_prompt(
+            ranked=ranked,
+            context=context,
+        )
+
+        system_instruction = (
+            "You are an expert SRE incident responder formulating a safe, human-reviewed remediation plan. "
+            "SAFETY REQUIREMENTS: "
+            "1. Never output executable shell commands or scripts (e.g. do NOT use kubectl, docker, rm, git reset, helm, systemctl, DROP TABLE). All steps must be descriptive human instructions. "
+            "2. Every step must have requires_human_approval=True. "
+            "3. All cited evidence IDs in evidence_ids must strictly come from the provided hypothesis and context. "
+            "4. Never output passwords, tokens, API keys, or credentials. "
+            "5. Provide actionable prerequisites, ordered steps, verification, rollback guidance, and escalation guidance. "
+            "Return valid JSON matching the RemediationPlan schema."
+        )
+
+        return await self._execute_structured_call(
+            method="generate_remediation",
+            prompt_version=PROMPT_VERSION_REMEDIATE,
+            prompt=prompt,
+            system_instruction=system_instruction,
+            target_model=RemediationPlan,
+        )
+
     # -----------------------------------------------------------------------
     # Core Execution Loop: Retries, Backoff, Schema Repair
     # -----------------------------------------------------------------------
@@ -784,3 +819,28 @@ class LLMReasoningProvider:
             f"Revise existing hypotheses based on new evidence:\n"
             f"{json.dumps(payload, indent=2)}"
         )
+
+    def _build_remediation_prompt(
+        self,
+        ranked: RankedHypothesisSet,
+        context: IncidentContextSnapshot,
+    ) -> str:
+        context_dump = context.model_dump(mode="json")
+        context_dump["incident"] = self._sanitize_incident_for_prompt(context.incident)
+        payload = {
+            "incident": self._sanitize_incident_for_prompt(context.incident),
+            "context": context_dump,
+            "ranked_hypotheses": ranked.model_dump(mode="json"),
+        }
+        return (
+            f"Prompt Version: {PROMPT_VERSION_REMEDIATE}\n"
+            "SAFETY REQUIREMENTS:\n"
+            "1. Provide human-readable, safe remediation steps. Do NOT provide executable shell commands (no kubectl, docker, rm, git, helm, etc.).\n"
+            "2. Every step must have requires_human_approval=true.\n"
+            "3. Cite only evidence IDs that exist in the ranked hypotheses or the context snapshot.\n"
+            "4. Do not include credentials, passwords, or secrets.\n"
+            "5. Tailor advice to the root cause category and provide verification and rollback guidance.\n\n"
+            f"Generate a safe, structured remediation plan for this incident:\n"
+            f"{json.dumps(payload, indent=2)}"
+        )
+
