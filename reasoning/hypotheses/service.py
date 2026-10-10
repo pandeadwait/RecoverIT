@@ -25,15 +25,12 @@ class DefaultHypothesisService:
 
     def __init__(
         self,
-        provider: ReasoningProvider | None = None,
+        provider: ReasoningProvider,
         generator: HypothesisGenerator | None = None,
         reviser: HypothesisReviser | None = None,
         citation_validator: CitationValidator | None = None,
         deduplicator: HypothesisDeduplicator | None = None,
     ) -> None:
-        if provider is None:
-            from tests.support.scripted_reasoning_provider import ScriptedReasoningProvider
-            provider = ScriptedReasoningProvider()
         self._provider = provider
         validator = citation_validator or CitationValidator()
         dedup = deduplicator or HypothesisDeduplicator()

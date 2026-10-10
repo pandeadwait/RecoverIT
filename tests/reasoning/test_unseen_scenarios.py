@@ -110,6 +110,7 @@ class TestUnseenIncidentReasoning:
         capabilities = _make_unseen_capabilities(incident.incident_id)
         budget = InvestigationBudget(max_rounds=3, max_queries=10)
         budget_usage = BudgetUsage()
+        provider = ScriptedReasoningProvider()
 
         # 1. Build initial context via DefaultContextBuilder
         context_builder = DefaultContextBuilder()
@@ -160,7 +161,7 @@ class TestUnseenIncidentReasoning:
         assert "frame decoder" in context.evidence[0].summary
 
         # 2. Generate initial hypotheses on unseen incident
-        hyp_service = DefaultHypothesisService()
+        hyp_service = DefaultHypothesisService(provider)
         hyp_set = await hyp_service.generate(
             incident=incident,
             context=context,
@@ -175,7 +176,7 @@ class TestUnseenIncidentReasoning:
             assert len(h.statement) > 0
 
         # 3. Assess missing information
-        assessor = MissingInformationAssessor()
+        assessor = MissingInformationAssessor(provider)
         assessment = await assessor.assess(
             incident=incident,
             capabilities=capabilities,
@@ -186,7 +187,7 @@ class TestUnseenIncidentReasoning:
         assert assessment.incident_id == incident.incident_id
 
         # 4. Plan evidence queries
-        planner = EvidenceQueryPlanner()
+        planner = EvidenceQueryPlanner(provider)
         plan = await planner.plan(
             assessment=assessment,
             capabilities=capabilities,

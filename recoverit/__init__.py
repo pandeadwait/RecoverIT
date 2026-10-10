@@ -1,3 +1,3 @@
-"""RecoverIT — Autonomous CI/CD Incident Triager & Self-Healer."""
+"""RecoverIT — Autonomous CI/CD Incident Investigator."""
 
 __version__ = "0.1.0"

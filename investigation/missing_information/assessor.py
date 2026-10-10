@@ -46,10 +46,7 @@ class MissingInformationAssessor:
     - Operates correctly on an empty initial context.
     """
 
-    def __init__(self, provider: ReasoningProvider | None = None) -> None:
-        if provider is None:
-            from tests.support.scripted_reasoning_provider import ScriptedReasoningProvider
-            provider = ScriptedReasoningProvider()
+    def __init__(self, provider: ReasoningProvider) -> None:
         self._provider = provider
 
     @property

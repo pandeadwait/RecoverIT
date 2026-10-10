@@ -1,7 +1,5 @@
-"""Log collector subpackage."""
+"""Live log collector."""
 
-from collectors.interfaces import LogSource
 from collectors.logs.file import FileLogAdapter
-from collectors.logs.fixture_adapter import FixtureLogAdapter
 
-__all__ = ["LogSource", "FileLogAdapter", "FixtureLogAdapter"]
+__all__ = ["FileLogAdapter"]

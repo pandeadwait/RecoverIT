@@ -31,7 +31,6 @@ class InvestigationResult:
     provider_used: str
     completion_criteria: dict[str, bool] = field(default_factory=dict)
     unresolved_criteria: list[str] = field(default_factory=list)
-    scenario_name: str | None = None
 
     def to_markdown_report(self) -> str:
         """Render a compact, source-neutral investigation report."""

@@ -28,13 +28,11 @@ from contracts.common import (
     InformationPriority,
     InformationValueLevel,
     InvestigationState,
-    InvestigationStatus,
     Reliability,
     RootCauseCategory,
     Severity,
     SourceCoverageStatus,
     SourceType,
-    StopReason,
 )
 from contracts.errors.schemas import (
     REASONING_PROVIDER_ERROR,
@@ -50,7 +48,6 @@ from contracts.hypothesis.schemas import (
     EvidenceCitation,
     Hypothesis,
     HypothesisSet,
-    RankedHypothesisSet,
 )
 from contracts.incident.schemas import IncidentSeed
 from contracts.investigation.schemas import (
@@ -59,11 +56,6 @@ from contracts.investigation.schemas import (
     KnownFact,
     MissingInformationAssessment,
     MissingInformationItem,
-)
-from investigation.orchestration.orchestrator import (
-    InMemoryCollectionService,
-    InMemoryContextBuilder,
-    InvestigationOrchestrator,
 )
 from reasoning.provider.interface import ReasoningProvider
 from reasoning.provider.llm_provider import (
@@ -616,141 +608,3 @@ async def test_llm_provider_credentials_not_logged_or_stored(
     for record in provider.call_records:
         record_str = str(record)
         assert secret_key not in record_str
-
-
-@pytest.mark.asyncio
-async def test_llm_provider_end_to_end_orchestration_loop(
-    sample_incident: IncidentSeed,
-    sample_catalog: SourceCapabilityCatalog,
-) -> None:
-    """Run full investigation loop using LLMReasoningProvider adapter."""
-    mia_json = json.dumps({
-        "schema_version": "1.0",
-        "incident_id": sample_incident.incident_id,
-        "assessment_id": "mia_e2e_01",
-        "known_facts": [],
-        "missing_information": [
-            {
-                "information_id": "need_logs_01",
-                "question": "Check recent error logs",
-                "reason": "Identify error signatures",
-                "priority": "high",
-                "candidate_sources": ["logs"],
-                "resolved": False,
-            }
-        ],
-        "unavailable_information": [],
-        "recommended_stop": False,
-    })
-
-    plan_json = json.dumps({
-        "schema_version": "1.0",
-        "incident_id": sample_incident.incident_id,
-        "plan_id": "plan_e2e_01",
-        "round": 1,
-        "queries": [
-            {
-                "query_id": "qry_e2e_01",
-                "source_type": "logs",
-                "question": "Fetch recent error logs",
-                "parameters": {"service": "order-service", "limit": 10},
-                "related_information_ids": ["need_logs_01"],
-                "expected_information_value": "high",
-            }
-        ],
-        "stop_reason": None,
-    })
-
-    hyp_json = json.dumps({
-        "schema_version": "1.0",
-        "incident_id": sample_incident.incident_id,
-        "revision": 1,
-        "generated_at": "2026-09-12T12:10:00Z",
-        "hypotheses": [
-            {
-                "schema_version": "1.0",
-                "hypothesis_id": "hyp_e2e_01",
-                "incident_id": sample_incident.incident_id,
-                "revision": 1,
-                "statement": "Application crashed due to unhandled configuration error.",
-                "root_cause_category": "configuration_regression",
-                "affected_component": "order-service",
-                "supporting_evidence": [{"evidence_id": "ev_logs_rec_qry_e2e_01_1", "reason": "Error observed in logs"}],
-                "contradicting_evidence": [],
-                "missing_information_ids": [],
-                "testable_prediction": "Crash backtrace points to config loading.",
-                "status": "active",
-            },
-            {
-                "schema_version": "1.0",
-                "hypothesis_id": "hyp_e2e_02",
-                "incident_id": sample_incident.incident_id,
-                "revision": 1,
-                "statement": "Network latency between service and cache.",
-                "root_cause_category": "resource_exhaustion",
-                "affected_component": "order-service",
-                "supporting_evidence": [{"evidence_id": "ev_logs_rec_qry_e2e_01_1", "reason": "Network timeout in log"}],
-                "contradicting_evidence": [],
-                "missing_information_ids": [],
-                "testable_prediction": "Ping packets dropped.",
-                "status": "active",
-            }
-        ]
-    })
-
-    client = MockLLMClient(
-        responses={
-            "assess_missing_info:v1.0": mia_json,
-            "plan_queries:v1.1": plan_json,
-            "generate_hypotheses:v1.0": hyp_json,
-        }
-    )
-    provider = LLMReasoningProvider(client=client)
-
-    collection_svc = InMemoryCollectionService()
-    context_builder = InMemoryContextBuilder()
-    orchestrator = InvestigationOrchestrator(
-        provider=provider,
-        collection_service=collection_svc,
-        context_builder=context_builder,
-    )
-
-    ranked_set = await orchestrator.run(
-        incident=sample_incident,
-        source_capabilities=sample_catalog,
-        budget=InvestigationBudget(max_rounds=1),
-    )
-
-    assert isinstance(ranked_set, RankedHypothesisSet)
-    assert ranked_set.status == InvestigationStatus.COMPLETED
-    assert len(ranked_set.hypotheses) == 2
-    assert ranked_set.hypotheses[0].rank == 1
-    assert ranked_set.hypotheses[1].rank == 2
-    assert ranked_set.hypotheses[0].evidence_score > 0.0
-
-
-@pytest.mark.asyncio
-async def test_llm_provider_failure_transitions_orchestrator_to_inconclusive(
-    sample_incident: IncidentSeed,
-    sample_catalog: SourceCapabilityCatalog,
-) -> None:
-    """Repeated invalid output from LLM triggers schema repair failure and transitions orchestrator to inconclusive."""
-    # Always return broken JSON
-    client = MockLLMClient(default_response="INVALID_JSON_NOT_RECOVERABLE")
-    provider = LLMReasoningProvider(client=client)
-
-    orchestrator = InvestigationOrchestrator(
-        provider=provider,
-        collection_service=InMemoryCollectionService(),
-        context_builder=InMemoryContextBuilder(),
-    )
-
-    ranked_set = await orchestrator.run(
-        incident=sample_incident,
-        source_capabilities=sample_catalog,
-    )
-
-    assert isinstance(ranked_set, RankedHypothesisSet)
-    assert ranked_set.status == InvestigationStatus.INCONCLUSIVE
-    assert ranked_set.stop_reason == StopReason.INSUFFICIENT_EVIDENCE
-    assert len(ranked_set.hypotheses) == 0

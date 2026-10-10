@@ -1,4 +1,4 @@
-# RecoverIT — Autonomous CI/CD Incident Triager & Self-Healer
+# RecoverIT — Autonomous CI/CD Incident Investigator
 
 An AI-driven DevOps agent that automatically investigates CI/CD and production incidents, identifies the most likely root cause using logs, metrics, deployment history, and code changes, and produces ranked root-cause hypotheses with supporting evidence.
 
@@ -27,6 +27,18 @@ pip install -e ".[dev]"
 pytest
 ```
 
+## Run a configured investigation
+
+The live runtime is configured explicitly; it does not load canned scenarios
+or fixture sources.
+
+```bash
+python -m recoverit.cli investigate \
+  --config path/to/runtime.json \
+  --incident path/to/incident.json \
+  --report path/to/investigation-report.md
+```
+
 ## Repository Structure
 
 ```
@@ -38,10 +50,13 @@ contracts/          # Shared schemas — reviewed by all team members
   investigation/    # (Person 3) MissingInformationAssessment, InvestigationBudget
   hypothesis/       # (Person 3) Hypothesis, RankedHypothesisSet
   errors/           # StructuredError
-ingestion/          # Person 1 — alert intake and validation
-collectors/         # Person 1 — source adapters and collection service
+recoverit/          # Live CLI, runtime composition, runner, and HTTP API
+investigation/graph/# LangGraph nodes, routing, dependencies, and state
+collectors/         # Real read-only source adapters and collection service
+evidence/           # Evidence normalization and context construction
+reasoning/          # LLM reasoning, hypothesis handling, ranking, stopping
 tests/              # Shared test suites
 docs/               # Architecture decisions and guides
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) and [WORK_DIVISION.md](WORK_DIVISION.md) for full details.
+See [ARCHITECTURE.md](ARCHITECTURE.md) and [docs/CLEANUP_AUDIT.md](docs/CLEANUP_AUDIT.md) for details.

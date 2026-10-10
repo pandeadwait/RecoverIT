@@ -167,7 +167,7 @@ async def build_runtime(
         if settings.mode is not RuntimeMode.LIVE:
             raise RuntimeConfigurationError(
                 "Only live runtimes may be assembled automatically. "
-                "Tests and benchmarks must inject their dependencies explicitly."
+                "Tests must inject their dependencies explicitly."
             )
         registry, dependencies = _build_live_dependencies(settings, dispatcher)
     if settings.mode is RuntimeMode.TEST:

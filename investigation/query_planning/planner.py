@@ -61,12 +61,9 @@ class EvidenceQueryPlanner:
 
     def __init__(
         self,
-        provider: ReasoningProvider | None = None,
+        provider: ReasoningProvider,
         budget_tracker: BudgetTracker | None = None,
     ) -> None:
-        if provider is None:
-            from tests.support.scripted_reasoning_provider import ScriptedReasoningProvider
-            provider = ScriptedReasoningProvider()
         self._provider = provider
         self._budget_tracker = budget_tracker
         self._last_warnings: list[StructuredError] = []
