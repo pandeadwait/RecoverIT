@@ -13,6 +13,7 @@ import logging
 from pathlib import Path
 import re
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from collectors.base import SourceAdapter
 from contracts.collection.schemas import EvidenceQuery, RawRecord, SourceCapability, SourceResult
@@ -30,13 +31,13 @@ LOG_LEVEL_PATTERN = re.compile(
 SERVICE_BRACKET_PATTERN = re.compile(r"\[([a-zA-Z0-9_\-]+)\]")
 
 
-def _parse_log_timestamp(value: object) -> datetime | None:
+def _parse_log_timestamp(value: object, assumed_timezone: ZoneInfo) -> datetime | None:
     """Parse a log timestamp and return an aware UTC datetime.
 
     File logs commonly omit a timezone (for example, Python's standard
     ``YYYY-MM-DD HH:MM:SS,mmm`` format). The file adapter treats those local
-    timestamps as UTC because there is no reliable source-specific timezone in
-    its configuration. Explicit offsets are converted to UTC.
+    timestamps using the source's configured timezone. Explicit offsets are
+    converted to UTC unchanged.
     """
     try:
         parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
@@ -44,7 +45,7 @@ def _parse_log_timestamp(value: object) -> datetime | None:
         return None
 
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
+        return parsed.replace(tzinfo=assumed_timezone).astimezone(timezone.utc)
     return parsed.astimezone(timezone.utc)
 
 
@@ -60,10 +61,18 @@ class FileLogAdapter(SourceAdapter):
         log_path: str | Path,
         service_name: str | None = None,
         only_errors: bool = False,
+        timestamp_timezone: str = "UTC",
     ) -> None:
         self.log_path = Path(log_path).resolve()
         self.service_name = service_name
         self.only_errors = only_errors
+        try:
+            self.timestamp_timezone = ZoneInfo(timestamp_timezone)
+        except ZoneInfoNotFoundError as exc:
+            raise ValueError(
+                f"Unknown timestamp_timezone '{timestamp_timezone}'. Use an IANA timezone "
+                "such as 'UTC' or 'Asia/Kolkata'."
+            ) from exc
 
     def exists(self) -> bool:
         """Check whether the configured log file or directory exists."""
@@ -253,7 +262,7 @@ class FileLogAdapter(SourceAdapter):
                     ts_val = data.get("timestamp") or data.get("time") or data.get("@timestamp")
                     parsed_time = None
                     if ts_val:
-                        parsed_time = _parse_log_timestamp(ts_val)
+                        parsed_time = _parse_log_timestamp(ts_val, self.timestamp_timezone)
 
                     payload = {
                         "message": str(msg),
@@ -281,7 +290,7 @@ class FileLogAdapter(SourceAdapter):
         time_match = ISO_TIMESTAMP_PATTERN.search(line)
         parsed_time = None
         if time_match:
-            parsed_time = _parse_log_timestamp(time_match.group(1))
+            parsed_time = _parse_log_timestamp(time_match.group(1), self.timestamp_timezone)
 
         level_match = LOG_LEVEL_PATTERN.search(line)
         level_str = level_match.group(1).lower() if level_match else "info"
