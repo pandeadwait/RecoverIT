@@ -148,9 +148,11 @@ class InvestigationRunner:
         )
         return self._to_result(output, incident, elapsed)
 
-    @staticmethod
     def _to_result(
-        output: dict[str, Any], incident: IncidentSeed, elapsed: float
+        self,
+        output: dict[str, Any],
+        incident: IncidentSeed,
+        elapsed: float,
     ) -> InvestigationResult:
         ranked = output["ranked_result"]
         context = output["context"]
@@ -210,10 +212,18 @@ class InvestigationRunner:
             diff_excerpts={},
             log_excerpts=[],
             budget_usage=ranked.budget_usage.model_dump(mode="json"),
-            provider_used="runtime-configured",
+            provider_used=self._provider_label(),
             completion_criteria=decision.criteria_status if decision else {},
             unresolved_criteria=decision.unresolved_criteria if decision else [],
         )
+
+    def _provider_label(self) -> str:
+        """Expose the configured provider/model without exposing credentials."""
+
+        settings = self._runtime.settings
+        if settings.llm_model == "unconfigured":
+            return settings.llm_provider
+        return f"{settings.llm_provider}/{settings.llm_model}"
 
 
 LangGraphInvestigationRunner = InvestigationRunner

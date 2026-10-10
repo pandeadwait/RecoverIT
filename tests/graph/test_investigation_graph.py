@@ -356,7 +356,11 @@ async def test_checkpoint_state_uses_incident_id_as_thread_id() -> None:
 async def test_graph_runner_invokes_runtime_with_incident_thread_id() -> None:
     deps = dependencies()
     runtime = await build_runtime(
-        RuntimeSettings(mode=RuntimeMode.TEST),
+        RuntimeSettings(
+            mode=RuntimeMode.TEST,
+            llm_provider="gemini",
+            llm_model="gemini-3.5-flash-lite",
+        ),
         registry=StaticCapabilityRegistry(),
         dependencies=deps,
     )
@@ -371,6 +375,7 @@ async def test_graph_runner_invokes_runtime_with_incident_thread_id() -> None:
     )
 
     assert result.status == InvestigationStatus.COMPLETED
+    assert result.provider_used == "gemini/gemini-3.5-flash-lite"
     assert snapshot.values["ranked_result"].incident_id == result.incident_id
     assert [event.stage for event in progress][-1] == "rank_hypotheses"
 
