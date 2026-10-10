@@ -22,10 +22,7 @@ from contracts.investigation.schemas import (
     StopDecision,
 )
 
-try:
-    from contracts.remediation.schemas import RemediationPlan
-except ImportError:
-    RemediationPlan = Any  # type: ignore
+from contracts.remediation.schemas import RemediationPlan
 
 
 @runtime_checkable
@@ -133,8 +130,8 @@ class Clock(Protocol):
 class RemediationPlanningService(Protocol):
     async def plan(
         self,
-        ranked: RankedHypothesisSet,
-        context: IncidentContextSnapshot,
+        ranked: RankedHypothesisSet | None,
+        context: IncidentContextSnapshot | None,
     ) -> RemediationPlan: ...
 
 

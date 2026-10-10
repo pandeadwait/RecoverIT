@@ -241,16 +241,9 @@ def _build_live_dependencies(
         model=getattr(client, "model", settings.llm_model),
     )
     ranking = RankingEngine()
-    try:
-        from remediation.planner import LLMRemediationPlanningService
-    except ImportError:  # pragma: no cover
-        LLMRemediationPlanningService = None  # type: ignore
+    from remediation.planner import LLMRemediationPlanningService
 
-    remediation_service = (
-        LLMRemediationPlanningService(reasoning_provider=provider)
-        if LLMRemediationPlanningService is not None
-        else None
-    )
+    remediation_service = LLMRemediationPlanningService(reasoning_provider=provider)
     dependencies = GraphDependencies(
         collection_service=DefaultCollectionService(
             registry=registry,

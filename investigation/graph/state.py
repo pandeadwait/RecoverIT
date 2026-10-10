@@ -5,10 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, TypedDict
 
-try:
-    from contracts.remediation.schemas import RemediationPlan
-except ImportError:
-    RemediationPlan = Any  # type: ignore
+from contracts.remediation.schemas import RemediationPlan
 
 from contracts.collection.schemas import (
     EvidenceQueryPlan,
