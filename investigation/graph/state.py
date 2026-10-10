@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TypedDict
+from typing import Any, TypedDict
+
+try:
+    from contracts.remediation.schemas import RemediationPlan
+except ImportError:
+    RemediationPlan = Any  # type: ignore
 
 from contracts.collection.schemas import (
     EvidenceQueryPlan,
@@ -49,6 +54,7 @@ class InvestigationGraphState(InvestigationInput, total=False):
     ranked_result: RankedHypothesisSet | None
     errors: list[StructuredError]
     progress_events: list[ProgressEvent]
+    remediation_plan: RemediationPlan | None
 
 
 class InvestigationOutput(TypedDict):
@@ -60,6 +66,7 @@ class InvestigationOutput(TypedDict):
     batch_history: list[RawEvidenceBatch]
     errors: list[StructuredError]
     progress_events: list[ProgressEvent]
+    remediation_plan: RemediationPlan | None
 
 
 __all__ = [
