@@ -48,15 +48,20 @@ def test_configured_app_owns_runtime_lifecycle(monkeypatch) -> None:
     class FakeRuntime:
         closed = False
 
-        def close(self) -> None:
+        async def aclose(self) -> None:
             self.closed = True
 
     runtime = FakeRuntime()
-    monkeypatch.setattr(configured, "build_runtime", lambda _: runtime)
+
+    async def build_fake_runtime(_):
+        return runtime
+
+    monkeypatch.setattr(configured, "build_runtime", build_fake_runtime)
 
     app = configured.create_configured_app(RuntimeSettings())
     with TestClient(app) as client:
         response = client.get("/")
+        assert app.state.runtime is runtime
 
     assert response.status_code == 200
     assert response.json()["service"] == "RecoverIT Live Investigation API"

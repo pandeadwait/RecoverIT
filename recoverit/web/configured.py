@@ -3,12 +3,46 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from typing import Callable
 
 from fastapi import FastAPI
 
+from contracts.errors.schemas import ProgressEvent
+from contracts.incident.schemas import IncidentSeed
+from contracts.investigation.schemas import InvestigationBudget
 from recoverit.composition import RuntimeSettings, build_runtime
-from recoverit.runner import InvestigationRunner
+from recoverit.runner import InvestigationResult, InvestigationRunner
 from recoverit.web.live import create_live_app
+
+
+class _ConfiguredExecutor:
+    """Bind the live runner during application startup, not at import time."""
+
+    def __init__(self) -> None:
+        self._runner: InvestigationRunner | None = None
+
+    def configure(self, runtime) -> None:
+        self._runner = InvestigationRunner(runtime)
+
+    def _require_runner(self) -> InvestigationRunner:
+        if self._runner is None:
+            raise RuntimeError("The RecoverIT runtime has not started.")
+        return self._runner
+
+    async def run(
+        self,
+        incident: IncidentSeed,
+        budget: InvestigationBudget | None = None,
+        progress_callback: Callable[[ProgressEvent], None] | None = None,
+    ) -> InvestigationResult:
+        return await self._require_runner().run(incident, budget, progress_callback)
+
+    async def resume(
+        self,
+        incident_id: str,
+        progress_callback: Callable[[ProgressEvent], None] | None = None,
+    ) -> InvestigationResult:
+        return await self._require_runner().resume(incident_id, progress_callback)
 
 
 def create_configured_app(settings: RuntimeSettings) -> FastAPI:
@@ -18,18 +52,19 @@ def create_configured_app(settings: RuntimeSettings) -> FastAPI:
     benchmark scenarios, replay fixtures, or scripted reasoning providers.
     """
 
-    runtime = build_runtime(settings)
-    executor = InvestigationRunner(runtime)
+    executor = _ConfiguredExecutor()
 
     @asynccontextmanager
-    async def lifespan(_: FastAPI):
+    async def lifespan(app: FastAPI):
+        runtime = await build_runtime(settings)
+        executor.configure(runtime)
+        app.state.runtime = runtime
         try:
             yield
         finally:
-            runtime.close()
+            await runtime.aclose()
 
     app = create_live_app(executor, lifespan=lifespan)
-    app.state.runtime = runtime
     return app
 
 

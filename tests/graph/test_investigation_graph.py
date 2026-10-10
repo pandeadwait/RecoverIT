@@ -355,7 +355,7 @@ async def test_checkpoint_state_uses_incident_id_as_thread_id() -> None:
 @pytest.mark.asyncio
 async def test_graph_runner_invokes_runtime_with_incident_thread_id() -> None:
     deps = dependencies()
-    runtime = build_runtime(
+    runtime = await build_runtime(
         RuntimeSettings(mode=RuntimeMode.TEST),
         registry=StaticCapabilityRegistry(),
         dependencies=deps,
@@ -377,7 +377,7 @@ async def test_graph_runner_invokes_runtime_with_incident_thread_id() -> None:
 
 @pytest.mark.asyncio
 async def test_graph_runner_reads_a_completed_checkpoint_by_incident_id() -> None:
-    runtime = build_runtime(
+    runtime = await build_runtime(
         RuntimeSettings(mode=RuntimeMode.TEST),
         registry=StaticCapabilityRegistry(),
         dependencies=dependencies(),
@@ -389,4 +389,27 @@ async def test_graph_runner_reads_a_completed_checkpoint_by_incident_id() -> Non
 
     assert resumed.incident_id == initial.incident_id
     assert resumed.status == InvestigationStatus.COMPLETED
+    assert resumed.ranked_hypotheses == initial.ranked_hypotheses
+
+
+@pytest.mark.asyncio
+async def test_durable_runtime_uses_async_sqlite_checkpoints(tmp_path) -> None:
+    """A durable runtime must support the runner's async graph invocation."""
+
+    runtime = await build_runtime(
+        RuntimeSettings(
+            mode=RuntimeMode.BENCHMARK,
+            checkpoint_database_path=tmp_path / "checkpoints.sqlite",
+        ),
+        registry=StaticCapabilityRegistry(),
+        dependencies=dependencies(),
+    )
+    try:
+        runner = LangGraphInvestigationRunner(runtime)
+        initial = await runner.run(invocation_input()["incident"])
+        resumed = await runner.resume(initial.incident_id)
+    finally:
+        await runtime.aclose()
+
+    assert resumed.incident_id == initial.incident_id
     assert resumed.ranked_hypotheses == initial.ranked_hypotheses

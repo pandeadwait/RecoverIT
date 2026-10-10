@@ -7,7 +7,7 @@ service objects or callbacks in graph state.
 
 from __future__ import annotations
 
-from contextlib import AbstractContextManager, contextmanager
+from contextlib import AbstractAsyncContextManager, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from enum import StrEnum
@@ -17,7 +17,7 @@ from typing import Any, Callable, Iterator, Protocol
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
-from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, Field, ValidationError
 
@@ -131,22 +131,23 @@ class ProgressDispatcher:
 class RuntimeContainer:
     """Fully composed graph application dependencies.
 
-    ``checkpoint_context`` is retained so a SQLite-backed saver remains open for
-    the life of the runner.  Call :meth:`close` during orderly shutdown.
+    ``checkpoint_context`` is retained so an async SQLite-backed saver remains
+    open for the life of the runner. Call :meth:`aclose` during orderly
+    shutdown.
     """
 
     settings: RuntimeSettings
     registry: CapabilityRegistry
     graph: CompiledStateGraph
     progress_dispatcher: ProgressDispatcher
-    checkpoint_context: AbstractContextManager[BaseCheckpointSaver] | None = None
+    checkpoint_context: AbstractAsyncContextManager[BaseCheckpointSaver] | None = None
 
-    def close(self) -> None:
+    async def aclose(self) -> None:
         if self.checkpoint_context is not None:
-            self.checkpoint_context.__exit__(None, None, None)
+            await self.checkpoint_context.__aexit__(None, None, None)
 
 
-def build_runtime(
+async def build_runtime(
     settings: RuntimeSettings,
     *,
     registry: CapabilityRegistry | None = None,
@@ -169,14 +170,14 @@ def build_runtime(
         registry, dependencies = _build_live_dependencies(settings, dispatcher)
     if settings.mode is RuntimeMode.TEST:
         checkpointer: BaseCheckpointSaver = InMemorySaver()
-        checkpoint_context: AbstractContextManager[BaseCheckpointSaver] | None = None
+        checkpoint_context: AbstractAsyncContextManager[BaseCheckpointSaver] | None = None
     else:
         path = settings.checkpoint_database_path
         if path is None:
             path = Path(".recoverit") / "checkpoints.sqlite"
         path.parent.mkdir(parents=True, exist_ok=True)
-        checkpoint_context = SqliteSaver.from_conn_string(str(path))
-        checkpointer = checkpoint_context.__enter__()
+        checkpoint_context = AsyncSqliteSaver.from_conn_string(str(path))
+        checkpointer = await checkpoint_context.__aenter__()
 
     graph_dependencies = GraphDependencies(
         collection_service=dependencies.collection_service,

@@ -548,7 +548,7 @@ async def investigate_flow(
     """Run the configured production runtime without scenario assumptions."""
 
     settings = load_runtime_settings(config_path)
-    runtime = build_runtime(settings)
+    runtime = await build_runtime(settings)
     try:
         return await run_live_investigation_flow(
             InvestigationRunner(runtime),
@@ -556,7 +556,7 @@ async def investigate_flow(
             report=report,
         )
     finally:
-        runtime.close()
+        await runtime.aclose()
 
 
 async def run_benchmark_flow(
