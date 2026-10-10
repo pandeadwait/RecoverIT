@@ -22,12 +22,30 @@ from contracts.incident.schemas import IncidentSeed
 logger = logging.getLogger(__name__)
 
 ISO_TIMESTAMP_PATTERN = re.compile(
-    r"(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)"
+    r"(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:?\d{2})?)"
 )
 LOG_LEVEL_PATTERN = re.compile(
     r"\b(CRITICAL|FATAL|ERROR|WARN(?:ING)?|INFO|DEBUG)\b", re.IGNORECASE
 )
 SERVICE_BRACKET_PATTERN = re.compile(r"\[([a-zA-Z0-9_\-]+)\]")
+
+
+def _parse_log_timestamp(value: object) -> datetime | None:
+    """Parse a log timestamp and return an aware UTC datetime.
+
+    File logs commonly omit a timezone (for example, Python's standard
+    ``YYYY-MM-DD HH:MM:SS,mmm`` format). The file adapter treats those local
+    timestamps as UTC because there is no reliable source-specific timezone in
+    its configuration. Explicit offsets are converted to UTC.
+    """
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 
@@ -235,10 +253,7 @@ class FileLogAdapter(SourceAdapter):
                     ts_val = data.get("timestamp") or data.get("time") or data.get("@timestamp")
                     parsed_time = None
                     if ts_val:
-                        try:
-                            parsed_time = datetime.fromisoformat(str(ts_val).replace("Z", "+00:00"))
-                        except Exception:
-                            pass
+                        parsed_time = _parse_log_timestamp(ts_val)
 
                     payload = {
                         "message": str(msg),
@@ -266,10 +281,7 @@ class FileLogAdapter(SourceAdapter):
         time_match = ISO_TIMESTAMP_PATTERN.search(line)
         parsed_time = None
         if time_match:
-            try:
-                parsed_time = datetime.fromisoformat(time_match.group(1).replace("Z", "+00:00"))
-            except Exception:
-                pass
+            parsed_time = _parse_log_timestamp(time_match.group(1))
 
         level_match = LOG_LEVEL_PATTERN.search(line)
         level_str = level_match.group(1).lower() if level_match else "info"

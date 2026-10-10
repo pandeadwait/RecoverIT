@@ -137,6 +137,31 @@ async def test_file_log_filtering_and_parsing(tmp_path: Path):
     assert "Gateway timeout" in res_pat.records[0].payload.get("raw", "")
 
 
+@pytest.mark.asyncio
+async def test_file_log_normalizes_naive_standard_timestamp_to_utc(tmp_path: Path):
+    """Standard Python logs must not violate RawRecord's aware-time contract."""
+    log_file = tmp_path / "service.log"
+    log_file.write_text(
+        "2026-10-10 15:21:56,485 ERROR [payment-api] checkout failed\n"
+    )
+
+    adapter = FileLogAdapter(log_path=log_file, only_errors=True)
+    result = await adapter.query(
+        EvidenceQuery(
+            query_id="q-naive-log-time",
+            source_type=SourceType.LOGS,
+            question="Fetch payment failures",
+            parameters={},
+        )
+    )
+
+    assert result.source_status == SourceStatus.OK
+    assert len(result.records) == 1
+    assert result.records[0].event_time == datetime(
+        2026, 10, 10, 15, 21, 56, 485000, tzinfo=timezone.utc
+    )
+
+
 # =============================================================================
 # 3. PrometheusMetricAdapter Tests
 # =============================================================================
