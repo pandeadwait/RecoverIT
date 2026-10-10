@@ -52,3 +52,9 @@ examples/
 .env
 .env.*
 !.env.example
+
+# Local runtime & checkpoints
+.recoverit/
+runtime/
+*.sqlite
+
