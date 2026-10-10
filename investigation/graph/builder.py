@@ -18,6 +18,7 @@ from investigation.graph.nodes import (
     hypothesize,
     initialize,
     plan_queries,
+    plan_remediation,
     rank_hypotheses,
 )
 from investigation.graph.routing import route_after_evaluation, route_after_plan
@@ -38,6 +39,7 @@ NODE_NAMES = (
     "evaluate_stopping",
     "rank_hypotheses",
     "finish_inconclusive",
+    "plan_remediation",
 )
 
 
@@ -69,6 +71,9 @@ def build_investigation_graph(
     builder.add_node(
         "finish_inconclusive", partial(finish_inconclusive, dependencies=dependencies)
     )
+    builder.add_node(
+        "plan_remediation", partial(plan_remediation, dependencies=dependencies)
+    )
 
     builder.add_edge(START, "initialize")
     builder.add_edge("initialize", "assess_gaps")
@@ -78,8 +83,13 @@ def build_investigation_graph(
     builder.add_edge("build_context", "hypothesize")
     builder.add_edge("hypothesize", "evaluate_stopping")
     builder.add_conditional_edges("evaluate_stopping", route_after_evaluation)
-    builder.add_edge("rank_hypotheses", END)
-    builder.add_edge("finish_inconclusive", END)
+    if dependencies.remediation_planning_service is not None:
+        builder.add_edge("rank_hypotheses", "plan_remediation")
+        builder.add_edge("finish_inconclusive", "plan_remediation")
+        builder.add_edge("plan_remediation", END)
+    else:
+        builder.add_edge("rank_hypotheses", END)
+        builder.add_edge("finish_inconclusive", END)
     return builder.compile(checkpointer=checkpointer)
 
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from contracts.collection.schemas import (
     EvidenceQueryPlan,
@@ -21,6 +21,11 @@ from contracts.investigation.schemas import (
     MissingInformationAssessment,
     StopDecision,
 )
+
+try:
+    from contracts.remediation.schemas import RemediationPlan
+except ImportError:
+    RemediationPlan = Any  # type: ignore
 
 
 @runtime_checkable
@@ -124,6 +129,15 @@ class Clock(Protocol):
     def now(self) -> datetime: ...
 
 
+@runtime_checkable
+class RemediationPlanningService(Protocol):
+    async def plan(
+        self,
+        ranked: RankedHypothesisSet,
+        context: IncidentContextSnapshot,
+    ) -> RemediationPlan: ...
+
+
 __all__ = [
     "Clock",
     "CollectionService",
@@ -133,5 +147,6 @@ __all__ = [
     "ProgressSink",
     "QueryPlanningService",
     "RankingService",
+    "RemediationPlanningService",
     "StoppingService",
 ]

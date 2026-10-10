@@ -9,6 +9,7 @@ from investigation.graph.nodes.hypothesize import hypothesize
 from investigation.graph.nodes.initialize import initialize
 from investigation.graph.nodes.plan import plan_queries
 from investigation.graph.nodes.rank import rank_hypotheses
+from investigation.graph.nodes.remediate import plan_remediation
 
 __all__ = [
     "assess_gaps",
@@ -19,5 +20,6 @@ __all__ = [
     "hypothesize",
     "initialize",
     "plan_queries",
+    "plan_remediation",
     "rank_hypotheses",
 ]

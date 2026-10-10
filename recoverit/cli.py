@@ -389,6 +389,121 @@ def display_results(
             border_color = "color(108)" if rank == 1 else "color(110)"
             console.print(Panel("\n".join(card_lines), title=f"[bold]Rank #{rank} — {conf} Confidence[/bold]", border_style=border_color))
 
+    # Suggested Remediation Plan
+    if getattr(res, "remediation_plan", None):
+        plan = res.remediation_plan
+        console.print("\n[bold]🛠️ Suggested Remediation — Human Review Required[/bold]")
+
+        safety_notice = plan.get("safety_notice", "Human review mandatory.")
+        console.print(
+            Panel(
+                f"[bold color(167)]⚠ Safety Notice:[/bold color(167)] {safety_notice}",
+                title="[bold]Human Operator Review Mandatory[/bold]",
+                border_style="color(167)",
+            )
+        )
+
+        risk_val = str(plan.get("risk", "blocked")).lower()
+        risk_styles = {
+            "low": "bold color(108)",
+            "medium": "bold color(110)",
+            "high": "bold color(179)",
+            "blocked": "bold color(167)",
+        }
+        risk_style = risk_styles.get(risk_val, "bold color(167)")
+        risk_badge = f"[{risk_style}]OPERATIONAL RISK: {risk_val.upper()}[/{risk_style}]"
+        console.print(Padding(Text.from_markup(risk_badge), (0, 0, 1, 0)))
+
+        rec_avail = plan.get("recommendation_available", False)
+        if rec_avail:
+            m_table = Table(box=None, show_header=False, padding=(0, 2))
+            m_table.add_column("Key", style="dim")
+            m_table.add_column("Value", style="white")
+
+            hyp_id = plan.get("hypothesis_id")
+            category = plan.get("root_cause_category")
+            conf = plan.get("confidence")
+            ev_ids = plan.get("evidence_ids", [])
+
+            if hyp_id:
+                m_table.add_row("Target Hypothesis", str(hyp_id))
+            if category:
+                m_table.add_row("Root Cause Category", str(category).replace("_", " ").title())
+            if conf:
+                m_table.add_row("Confidence", str(conf).upper())
+            if ev_ids:
+                m_table.add_row("Cited Evidence", ", ".join(str(e) for e in ev_ids))
+
+            console.print(m_table)
+
+            prereqs = plan.get("prerequisites", [])
+            if prereqs:
+                console.print("\n[bold color(110)]Prerequisites:[/bold color(110)]")
+                for p in prereqs:
+                    console.print(f"  • [white]{p}[/white]")
+
+            steps = plan.get("steps", [])
+            if steps:
+                console.print("\n[bold color(108)]Remediation Steps:[/bold color(108)]")
+                for s in steps:
+                    s_num = s.get("step_number", 1)
+                    s_title = s.get("title", "")
+                    s_purpose = s.get("purpose", "")
+                    s_inst = s.get("instructions", [])
+                    s_exp = s.get("expected_result", "")
+                    s_ver = s.get("verification", [])
+                    s_rb = s.get("rollback_guidance", [])
+
+                    step_lines = [
+                        f"[bold color(109)]Purpose:[/bold color(109)] {s_purpose}",
+                        f"[dim]Human Approval:[/dim] [bold color(108)]Mandatory[/bold color(108)]",
+                        "",
+                        "[bold color(110)]Instructions:[/bold color(110)]",
+                    ]
+                    for idx, inst in enumerate(s_inst, 1):
+                        step_lines.append(f"  {idx}. [white]{inst}[/white]")
+                    step_lines.append("")
+                    step_lines.append(f"[bold color(108)]Expected Result:[/bold color(108)] {s_exp}")
+
+                    if s_ver:
+                        step_lines.append("")
+                        step_lines.append("[bold color(139)]Verification:[/bold color(139)]")
+                        for v in s_ver:
+                            step_lines.append(f"  • [white]{v}[/white]")
+
+                    if s_rb:
+                        step_lines.append("")
+                        step_lines.append("[bold color(179)]Rollback Guidance:[/bold color(179)]")
+                        for rb in s_rb:
+                            step_lines.append(f"  • [white]{rb}[/white]")
+
+                    console.print(
+                        Panel(
+                            "\n".join(step_lines),
+                            title=f"[bold]Step {s_num}: {s_title}[/bold]",
+                            border_style="color(110)",
+                            padding=(0, 1),
+                        )
+                    )
+        else:
+            console.print(
+                Panel(
+                    "[bold color(179)]No production change recommended. Operator escalation required.[/bold color(179)]",
+                    border_style="color(179)",
+                )
+            )
+            escalation = plan.get("escalation_guidance", [])
+            if escalation:
+                console.print("\n[bold color(179)]Escalation Guidance:[/bold color(179)]")
+                for e in escalation:
+                    console.print(f"  • [color(179)]{e}[/color(179)]")
+
+            uncertainties = plan.get("unresolved_uncertainty", [])
+            if uncertainties:
+                console.print("\n[bold color(139)]Unresolved Uncertainty:[/bold color(139)]")
+                for u in uncertainties:
+                    console.print(f"  • [dim]{u}[/dim]")
+
     # Save Markdown report if requested
     if report_path:
         out_file = Path(report_path)
