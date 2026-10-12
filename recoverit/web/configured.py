@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Callable
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from contracts.errors.schemas import ProgressEvent
 from contracts.incident.schemas import IncidentSeed
 from contracts.investigation.schemas import InvestigationBudget
 from recoverit.composition import RuntimeSettings, build_runtime
 from recoverit.runner import InvestigationResult, InvestigationRunner
-from recoverit.web.live import create_live_app
+from recoverit.web.live import create_live_app, result_payload
 
 
 class _ConfiguredExecutor:
@@ -65,6 +68,26 @@ def create_configured_app(settings: RuntimeSettings) -> FastAPI:
             await runtime.aclose()
 
     app = create_live_app(executor, lifespan=lifespan)
+
+    @app.get("/api/investigations/{incident_id}")
+    async def get_investigation(incident_id: str) -> dict[str, object]:
+        try:
+            result = await executor.resume(incident_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail="Failed to retrieve investigation.") from exc
+        return result_payload(result)
+
+    static_dir = Path(__file__).parent / "static"
+    if static_dir.exists():
+        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+        @app.get("/ui", include_in_schema=False)
+        @app.get("/ui/", include_in_schema=False)
+        async def ui_page():
+            return FileResponse(str(static_dir / "index.html"))
+
     return app
 
 

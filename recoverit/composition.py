@@ -191,6 +191,7 @@ async def build_runtime(
         ranking_service=dependencies.ranking_service,
         progress_sink=dispatcher,
         clock=dependencies.clock,
+        remediation_planning_service=dependencies.remediation_planning_service,
     )
     graph = build_investigation_graph(graph_dependencies, checkpointer=checkpointer)
     return RuntimeContainer(
@@ -240,6 +241,9 @@ def _build_live_dependencies(
         model=getattr(client, "model", settings.llm_model),
     )
     ranking = RankingEngine()
+    from remediation.planner import LLMRemediationPlanningService
+
+    remediation_service = LLMRemediationPlanningService(reasoning_provider=provider)
     dependencies = GraphDependencies(
         collection_service=DefaultCollectionService(
             registry=registry,
@@ -255,6 +259,7 @@ def _build_live_dependencies(
         ranking_service=ranking,
         progress_sink=dispatcher,
         clock=clock,
+        remediation_planning_service=remediation_service,
     )
     return registry, dependencies
 

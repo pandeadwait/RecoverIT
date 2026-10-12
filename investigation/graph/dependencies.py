@@ -13,6 +13,7 @@ from investigation.graph.ports import (
     ProgressSink,
     QueryPlanningService,
     RankingService,
+    RemediationPlanningService,
     StoppingService,
 )
 
@@ -28,6 +29,7 @@ class GraphDependencies:
     ranking_service: RankingService
     progress_sink: ProgressSink
     clock: Clock
+    remediation_planning_service: RemediationPlanningService | None = None
 
 
 __all__ = ["GraphDependencies"]

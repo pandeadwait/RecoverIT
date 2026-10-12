@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 import time
 from typing import Any
@@ -31,6 +31,7 @@ class InvestigationResult:
     provider_used: str
     completion_criteria: dict[str, bool] = field(default_factory=dict)
     unresolved_criteria: list[str] = field(default_factory=list)
+    remediation_plan: dict[str, Any] | None = None
 
     def to_markdown_report(self) -> str:
         """Render a compact, source-neutral investigation report."""
@@ -84,6 +85,91 @@ class InvestigationResult:
         if self.unresolved_criteria:
             lines.extend(["## Remaining uncertainty", ""])
             lines.extend(f"- {item}" for item in self.unresolved_criteria)
+
+        if self.remediation_plan:
+            plan = self.remediation_plan
+            lines.extend(
+                [
+                    "",
+                    "## Suggested Remediation — Human Review Required",
+                    "",
+                    f"> **Safety Notice:** {plan.get('safety_notice', 'Human operator review required.')}",
+                    "",
+                ]
+            )
+            rec_avail = plan.get("recommendation_available", False)
+            risk = str(plan.get("risk", "blocked")).upper()
+            lines.append(f"**Operational Risk Tier:** `{risk}`  \n")
+
+            if rec_avail:
+                hyp_id = plan.get("hypothesis_id")
+                category = plan.get("root_cause_category")
+                conf = plan.get("confidence")
+                ev_ids = plan.get("evidence_ids", [])
+                lines.extend(
+                    [
+                        "### Targeted Root Cause",
+                        f"- Hypothesis: `{hyp_id or 'N/A'}`",
+                        f"- Category: `{category or 'N/A'}`",
+                        f"- Confidence: `{str(conf).upper() if conf else 'N/A'}`",
+                        f"- Cited Evidence: {', '.join(f'`{eid}`' for eid in ev_ids) if ev_ids else 'None'}",
+                        "",
+                    ]
+                )
+                prereqs = plan.get("prerequisites", [])
+                if prereqs:
+                    lines.extend(["### Prerequisites", ""])
+                    lines.extend(f"- {p}" for p in prereqs)
+                    lines.append("")
+
+                steps = plan.get("steps", [])
+                if steps:
+                    lines.extend(["### Remediation Steps", ""])
+                    for s in steps:
+                        num = s.get("step_number", 1)
+                        title = s.get("title", "")
+                        purpose = s.get("purpose", "")
+                        expected = s.get("expected_result", "")
+                        instructions = s.get("instructions", [])
+                        verification = s.get("verification", [])
+                        rollback = s.get("rollback_guidance", [])
+                        approval = s.get("requires_human_approval", True)
+
+                        lines.extend(
+                            [
+                                f"#### Step {num}: {title}",
+                                f"- **Purpose:** {purpose}",
+                                f"- **Human Approval Required:** `{'Yes' if approval else 'No'}`",
+                                "- **Instructions:**",
+                            ]
+                        )
+                        lines.extend(f"  1. {inst}" for inst in instructions)
+                        lines.append(f"- **Expected Result:** {expected}")
+                        if verification:
+                            lines.append("- **Verification:**")
+                            lines.extend(f"  - {v}" for v in verification)
+                        if rollback:
+                            lines.append("- **Rollback Guidance:**")
+                            lines.extend(f"  - {rb}" for rb in rollback)
+                        lines.append("")
+            else:
+                lines.extend(
+                    [
+                        "> **No production change recommended.**",
+                        "",
+                    ]
+                )
+                escalation = plan.get("escalation_guidance", [])
+                if escalation:
+                    lines.extend(["### Escalation Guidance", ""])
+                    lines.extend(f"- {e}" for e in escalation)
+                    lines.append("")
+                uncertainties = plan.get("unresolved_uncertainty", [])
+                if uncertainties:
+                    lines.extend(["### Unresolved Uncertainty", ""])
+                    lines.extend(f"- {u}" for u in uncertainties)
+                    lines.append("")
+
         return "\n".join(lines)
 
 
@@ -156,6 +242,16 @@ class InvestigationRunner:
         ranked = output["ranked_result"]
         context = output["context"]
         decision = output.get("stop_decision")
+        raw_plan = output.get("remediation_plan")
+        plan_dict = None
+        if raw_plan is not None:
+            if hasattr(raw_plan, "model_dump"):
+                plan_dict = raw_plan.model_dump(mode="json")
+            elif isinstance(raw_plan, dict):
+                plan_dict = raw_plan
+            elif hasattr(raw_plan, "__dataclass_fields__"):
+                plan_dict = asdict(raw_plan)
+
         return InvestigationResult(
             incident_id=incident.incident_id,
             service=incident.service,
@@ -214,6 +310,7 @@ class InvestigationRunner:
             provider_used=self._provider_label(),
             completion_criteria=decision.criteria_status if decision else {},
             unresolved_criteria=decision.unresolved_criteria if decision else [],
+            remediation_plan=plan_dict,
         )
 
     def _provider_label(self) -> str:

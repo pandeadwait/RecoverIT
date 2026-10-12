@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RecoverIT — Incident Investigation & Remediation Guidance</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header class="app-header">
+        <div class="header-container">
+            <div class="brand">
+                <span class="brand-logo">🛠️</span>
+                <div>
+                    <h1 class="brand-title">RecoverIT</h1>
+                    <span class="brand-subtitle">Autonomous CI/CD Incident Investigator</span>
+                </div>
+            </div>
+            <div class="header-status">
+                <span class="status-indicator"></span>
+                <span>Recommendation-Only Mode · No Autonomous Writes</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="dashboard-container">
+        <!-- Incident Lookup / Input -->
+        <section class="card lookup-section">
+            <div class="card-header">
+                <h2>Investigation Viewer</h2>
+            </div>
+            <div class="lookup-form">
+                <input type="text" id="incident-id-input" placeholder="Enter Incident ID (e.g. inc-payments-42)..." />
+                <button type="button" id="load-btn" class="btn btn-primary">Load Investigation</button>
+            </div>
+        </section>
+
+        <!-- Incident Summary Panel -->
+        <section id="summary-section" class="card summary-panel" style="display: none;">
+            <div class="card-header">
+                <h2>Incident Overview</h2>
+                <span id="investigation-status-badge" class="badge">COMPLETED</span>
+            </div>
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <span class="label">Incident ID</span>
+                    <span id="overview-incident-id" class="value">—</span>
+                </div>
+                <div class="summary-item">
+                    <span class="label">Target Service</span>
+                    <span id="overview-service" class="value">—</span>
+                </div>
+                <div class="summary-item">
+                    <span class="label">Duration</span>
+                    <span id="overview-duration" class="value">—</span>
+                </div>
+                <div class="summary-item">
+                    <span class="label">Reasoning Provider</span>
+                    <span id="overview-provider" class="value">—</span>
+                </div>
+                <div class="summary-item full-width">
+                    <span class="label">Incident Summary</span>
+                    <p id="overview-summary" class="value">—</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Ranked Hypotheses Panel -->
+        <section id="hypotheses-section" class="card" style="display: none;">
+            <div class="card-header">
+                <h2>Ranked Root-Cause Hypotheses</h2>
+            </div>
+            <div id="hypotheses-list" class="hypotheses-container"></div>
+        </section>
+
+        <!-- Suggested Remediation Panel -->
+        <section id="remediation-section" class="card remediation-card" style="display: none;">
+            <div class="card-header remediation-header">
+                <div class="title-with-badge">
+                    <h2>Suggested Remediation — Human Review Required</h2>
+                    <span id="remediation-risk-badge" class="badge risk-badge">RISK: BLOCKED</span>
+                </div>
+                <span class="badge notice-badge">Advisory Only · Mandatory Human Operator Sign-Off</span>
+            </div>
+
+            <!-- Prominent Safety Notice Banner -->
+            <div id="remediation-safety-banner" class="safety-banner">
+                <span class="safety-icon">⚠️</span>
+                <div class="safety-content">
+                    <strong>Mandatory Operator Review:</strong>
+                    <span id="remediation-safety-text">All recommendations are advisory guidance. Operators must verify current infrastructure state and follow standard change management prior to taking action.</span>
+                </div>
+            </div>
+
+            <!-- Blocked Notice Banner (shown when recommendation_available is false) -->
+            <div id="remediation-blocked-banner" class="blocked-banner" style="display: none;">
+                <span class="blocked-icon">🛑</span>
+                <div class="blocked-content">
+                    <h3>No production change recommended. Operator escalation required.</h3>
+                    <p>Evidence confidence does not meet the safety threshold for proposed action, or contradictory evidence was identified.</p>
+                </div>
+            </div>
+
+            <!-- Target Hypothesis Metadata -->
+            <div id="remediation-target-metadata" class="remediation-meta-grid" style="display: none;">
+                <div class="meta-item">
+                    <span class="label">Addressed Hypothesis</span>
+                    <span id="remediation-hypothesis-id" class="value">—</span>
+                </div>
+                <div class="meta-item">
+                    <span class="label">Root Cause Category</span>
+                    <span id="remediation-category" class="value">—</span>
+                </div>
+                <div class="meta-item">
+                    <span class="label">Confidence</span>
+                    <span id="remediation-confidence" class="value">—</span>
+                </div>
+                <div class="meta-item">
+                    <span class="label">Supporting Evidence IDs</span>
+                    <span id="remediation-evidence-ids" class="value">—</span>
+                </div>
+            </div>
+
+            <!-- Prerequisites -->
+            <div id="remediation-prereqs-container" class="prereqs-container" style="display: none;">
+                <h3>Operational Prerequisites</h3>
+                <ul id="remediation-prereqs-list"></ul>
+            </div>
+
+            <!-- Remediation Step Cards -->
+            <div id="remediation-steps-container" class="steps-container" style="display: none;">
+                <h3>Remediation Steps</h3>
+                <div id="remediation-steps-list"></div>
+            </div>
+
+            <!-- Escalation Guidance (for blocked or unresolved) -->
+            <div id="remediation-escalation-container" class="escalation-container" style="display: none;">
+                <h3>Escalation Guidance</h3>
+                <ul id="remediation-escalation-list"></ul>
+            </div>
+
+            <!-- Unresolved Uncertainty -->
+            <div id="remediation-uncertainty-container" class="uncertainty-container" style="display: none;">
+                <h3>Unresolved Uncertainties</h3>
+                <ul id="remediation-uncertainty-list"></ul>
+            </div>
+        </section>
+    </main>
+
+    <footer class="app-footer">
+        <p>RecoverIT · Safety Invariant: Descriptive operational guidance only. Autonomous modifications, shell executions, and automated rollbacks are strictly forbidden.</p>
+    </footer>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

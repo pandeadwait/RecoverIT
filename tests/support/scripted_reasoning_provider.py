@@ -27,6 +27,7 @@ from contracts.hypothesis.schemas import (
     EvidenceCitation,
     Hypothesis,
     HypothesisSet,
+    RankedHypothesisSet,
 )
 from contracts.incident.schemas import IncidentSeed
 from contracts.investigation.schemas import (
@@ -36,6 +37,11 @@ from contracts.investigation.schemas import (
     KnownFact,
     MissingInformationAssessment,
     MissingInformationItem,
+)
+from contracts.remediation.schemas import (
+    RemediationPlan,
+    RemediationRisk,
+    RemediationStep,
 )
 
 
@@ -53,12 +59,14 @@ class ScriptedReasoningProvider:
         custom_plan: EvidenceQueryPlan | None = None,
         custom_hypotheses: HypothesisSet | None = None,
         custom_revised_hypotheses: HypothesisSet | None = None,
+        custom_remediation: RemediationPlan | None = None,
         **kwargs: Any,
     ) -> None:
         self.custom_assessment = custom_assessment
         self.custom_plan = custom_plan
         self.custom_hypotheses = custom_hypotheses
         self.custom_revised_hypotheses = custom_revised_hypotheses
+        self.custom_remediation = custom_remediation
         self._calls: list[dict[str, Any]] = []
 
     @property
@@ -277,6 +285,82 @@ class ScriptedReasoningProvider:
             incident_id=previous_hypotheses.incident_id,
             hypotheses=revised,
             generated_at=now,
+        )
+
+    async def generate_remediation(
+        self,
+        ranked: RankedHypothesisSet,
+        context: IncidentContextSnapshot,
+    ) -> RemediationPlan:
+        self._calls.append({
+            "method": "generate_remediation",
+            "incident_id": ranked.incident_id,
+        })
+        if self.custom_remediation is not None:
+            return self.custom_remediation
+
+        top_hyp = ranked.hypotheses[0] if ranked.hypotheses else None
+        now = datetime.now(timezone.utc)
+        if top_hyp is None:
+            return RemediationPlan(
+                plan_id=f"plan-scripted-{ranked.incident_id}",
+                incident_id=ranked.incident_id,
+                created_at=now,
+                recommendation_available=False,
+                safety_notice="No recommendation available: ranking has no hypotheses.",
+                risk=RemediationRisk.BLOCKED,
+                prerequisites=[],
+                steps=[],
+                escalation_guidance=["Escalate to primary on-call engineer."],
+                unresolved_uncertainty=["No leading hypothesis available."],
+            )
+
+        cited_evidence_ids = (
+            [c.evidence_id for c in top_hyp.supporting_evidence]
+            if top_hyp.supporting_evidence
+            else []
+        )
+        if not cited_evidence_ids and context.evidence:
+            cited_evidence_ids = [context.evidence[0].evidence_id]
+        if not cited_evidence_ids:
+            cited_evidence_ids = ["ev_default"]
+
+        rc_val = str(getattr(top_hyp.root_cause_category, "value", top_hyp.root_cause_category))
+
+        return RemediationPlan(
+            plan_id=f"plan-scripted-{ranked.incident_id}",
+            incident_id=ranked.incident_id,
+            created_at=now,
+            recommendation_available=True,
+            safety_notice="HUMAN APPROVAL MANDATORY. Review proposed operational guidance before executing any actions.",
+            hypothesis_id=top_hyp.hypothesis_id,
+            root_cause_category=top_hyp.root_cause_category,
+            confidence=top_hyp.confidence_label,
+            evidence_ids=cited_evidence_ids,
+            risk=RemediationRisk.LOW,
+            prerequisites=[
+                f"Verify operational permissions for service '{top_hyp.affected_component}'.",
+                "Ensure staging rollback validation was completed.",
+            ],
+            steps=[
+                RemediationStep(
+                    step_number=1,
+                    title="Review service configuration in version control",
+                    purpose=f"Mitigate identified {rc_val} condition on {top_hyp.affected_component}.",
+                    instructions=[
+                        f"Locate deployment or configuration changes for {top_hyp.affected_component}.",
+                        "Verify health metrics after reviewing configuration.",
+                    ],
+                    expected_result="Healthy operational metrics restored.",
+                    verification=["Check HTTP 5xx error rate drops below 0.1%."],
+                    rollback_guidance=["Restore previous deployment artifact if degradation persists."],
+                    requires_human_approval=True,
+                )
+            ],
+            escalation_guidance=[
+                f"Contact on-call team for service '{top_hyp.affected_component}'.",
+            ],
+            unresolved_uncertainty=[],
         )
 
 
@@ -1097,3 +1181,4 @@ class FakeReasoningProvider(ScriptedReasoningProvider):
             hypotheses=revised,
             generated_at=now,
         )
+

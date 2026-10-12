@@ -11,13 +11,18 @@ from typing import Any
 
 from contracts.collection.schemas import SourceCapabilityCatalog
 from contracts.evidence.schemas import IncidentContextSnapshot
-from contracts.hypothesis.schemas import Hypothesis, HypothesisSet
+from contracts.hypothesis.schemas import (
+    Hypothesis,
+    HypothesisSet,
+    RankedHypothesisSet,
+)
 from contracts.incident.schemas import IncidentSeed
 from contracts.investigation.schemas import (
     EvidenceQueryPlan,
     InvestigationBudget,
     MissingInformationAssessment,
 )
+from contracts.remediation.schemas import RemediationPlan
 
 
 class UnrecordedRequestError(KeyError):
@@ -195,6 +200,32 @@ class RecordedReasoningProvider:
         if isinstance(raw, HypothesisSet):
             return raw
         return HypothesisSet.model_validate(raw)
+
+    async def generate_remediation(
+        self,
+        ranked: RankedHypothesisSet,
+        context: IncidentContextSnapshot,
+    ) -> RemediationPlan:
+        method = "generate_remediation"
+        call_num = self._increment_call(method)
+        round_num = getattr(context, "round", getattr(context, "revision", call_num))
+
+        raw = self._lookup(
+            method=method,
+            incident_id=ranked.incident_id,
+            round_num=round_num,
+            call_num=call_num,
+        )
+
+        self._calls.append({
+            "method": method,
+            "incident_id": ranked.incident_id,
+            "round": round_num,
+        })
+
+        if isinstance(raw, RemediationPlan):
+            return raw
+        return RemediationPlan.model_validate(raw)
 
     # -----------------------------------------------------------------------
     # Helper lookup logic

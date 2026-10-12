@@ -13,13 +13,14 @@ from typing import Protocol, runtime_checkable
 
 from contracts.collection.schemas import SourceCapabilityCatalog
 from contracts.evidence.schemas import IncidentContextSnapshot
-from contracts.hypothesis.schemas import Hypothesis, HypothesisSet
+from contracts.hypothesis.schemas import Hypothesis, HypothesisSet, RankedHypothesisSet
 from contracts.incident.schemas import IncidentSeed
 from contracts.investigation.schemas import (
     EvidenceQueryPlan,
     InvestigationBudget,
     MissingInformationAssessment,
 )
+from contracts.remediation.schemas import RemediationPlan
 
 
 @runtime_checkable
@@ -83,5 +84,17 @@ class ReasoningProvider(Protocol):
         Update, strengthen, weaken, or reject hypotheses based on new evidence.
 
         Returns an updated HypothesisSet object.
+        """
+        ...
+
+    async def generate_remediation(
+        self,
+        ranked: RankedHypothesisSet,
+        context: IncidentContextSnapshot,
+    ) -> RemediationPlan:
+        """
+        Generate a structured remediation plan based on ranked hypotheses and context.
+
+        Returns a canonical RemediationPlan object.
         """
         ...
