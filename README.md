@@ -1,36 +1,21 @@
-# RecoverIT — Autonomous CI/CD Incident Investigator
+# RecoverIT
 
-An AI-driven DevOps agent that automatically investigates CI/CD and production incidents, identifies the most likely root cause using logs, metrics, deployment history, and code changes, and produces ranked root-cause hypotheses with supporting evidence.
+RecoverIT investigates CI/CD and production incidents using configured read-only sources. It builds evidence-linked hypotheses, ranks likely causes, and produces an investigation report with human-review remediation guidance.
 
-## Project Setup
+## Quick start
 
-### Prerequisites
-
-- Python 3.11+
-
-### Install
+Requires Python 3.11 or newer.
 
 ```bash
-# Create and activate a virtual environment
 python -m venv .venv
-
-# Windows
-.venv\Scripts\activate
-
-# Install the project with dev dependencies
-pip install -e ".[dev]"
+source .venv/bin/activate
+python -m pip install -e '.[dev]'
+python -m pytest
 ```
 
-### Run Tests
+On Windows, activate the environment with `.venv\Scripts\activate` before installing.
 
-```bash
-pytest
-```
-
-## Run a configured investigation
-
-The live runtime is configured explicitly; it does not load canned scenarios
-or fixture sources.
+Copy [docs/live-runtime.example.json](docs/live-runtime.example.json) and set the source configuration and provider credentials for your environment. Then run an investigation using an incident JSON such as [docs/incident.example.json](docs/incident.example.json):
 
 ```bash
 python -m recoverit.cli investigate \
@@ -39,24 +24,24 @@ python -m recoverit.cli investigate \
   --report path/to/investigation-report.md
 ```
 
-## Repository Structure
+To start the HTTP API and browser UI with the same configuration:
 
-```
-contracts/          # Shared schemas — reviewed by all team members
-  incident/         # IncidentAlert, IncidentSeed
-  collection/       # SourceCapabilityCatalog, EvidenceQueryPlan, RawEvidenceBatch
-  evidence/         # (Person 2) EvidenceRecord
-  timeline/         # (Person 2) TimelineEvent, TemporalRelationship
-  investigation/    # (Person 3) MissingInformationAssessment, InvestigationBudget
-  hypothesis/       # (Person 3) Hypothesis, RankedHypothesisSet
-  errors/           # StructuredError
-recoverit/          # Live CLI, runtime composition, runner, and HTTP API
-investigation/graph/# LangGraph nodes, routing, dependencies, and state
-collectors/         # Real read-only source adapters and collection service
-evidence/           # Evidence normalization and context construction
-reasoning/          # LLM reasoning, hypothesis handling, ranking, stopping
-tests/              # Shared test suites
-docs/               # Architecture decisions and guides
+```bash
+python -m recoverit.serve --config path/to/runtime.json
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) and [docs/CLEANUP_AUDIT.md](docs/CLEANUP_AUDIT.md) for details.
+## Repository map
+
+| Path | Purpose |
+| --- | --- |
+| `contracts/` | Shared incident, evidence, hypothesis, and result schemas |
+| `collectors/` | Read-only source adapters |
+| `investigation/` | LangGraph workflow, planning, and budgets |
+| `evidence/`, `timeline/` | Context construction and evidence processing |
+| `reasoning/`, `remediation/` | Hypothesis ranking and advisory plans |
+| `recoverit/` | Runtime composition, CLI, API, and browser UI |
+| `tests/` | Automated tests and fixtures |
+| `docs/` | Architecture, guides, plans, phases, handoffs, and report outline |
+| `Report/` | Academic report drafts, PDFs, images, and presentations |
+
+Start with the [documentation index](docs/INDEX.md), [architecture](docs/architecture/ARCHITECTURE.md), and [repository guide](docs/guides/REPOSITORY_GUIDE.md). The [cleanup audit](docs/guides/CLEANUP_AUDIT.md) explains the current runtime path and retired components.

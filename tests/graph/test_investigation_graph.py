@@ -50,7 +50,12 @@ from investigation.graph import (
     route_after_evaluation,
     route_after_plan,
 )
-from recoverit.composition import RuntimeMode, RuntimeSettings, build_runtime
+from recoverit.composition import (
+    CHECKPOINT_ALLOWED_TYPES,
+    RuntimeMode,
+    RuntimeSettings,
+    build_runtime,
+)
 from recoverit.runner import LangGraphInvestigationRunner
 
 
@@ -401,20 +406,37 @@ async def test_graph_runner_reads_a_completed_checkpoint_by_incident_id() -> Non
 async def test_durable_runtime_uses_async_sqlite_checkpoints(tmp_path) -> None:
     """A durable runtime must support the runner's async graph invocation."""
 
+    settings = RuntimeSettings(
+        mode=RuntimeMode.BENCHMARK,
+        checkpoint_database_path=tmp_path / "checkpoints.sqlite",
+    )
     runtime = await build_runtime(
-        RuntimeSettings(
-            mode=RuntimeMode.BENCHMARK,
-            checkpoint_database_path=tmp_path / "checkpoints.sqlite",
-        ),
+        settings,
         registry=StaticCapabilityRegistry(),
         dependencies=dependencies(),
     )
     try:
+        assert runtime.graph.checkpointer.serde._allowed_msgpack_modules == set(
+            CHECKPOINT_ALLOWED_TYPES
+        )
         runner = LangGraphInvestigationRunner(runtime)
         initial = await runner.run(invocation_input()["incident"])
         resumed = await runner.resume(initial.incident_id)
     finally:
         await runtime.aclose()
 
+    reopened = await build_runtime(
+        settings,
+        registry=StaticCapabilityRegistry(),
+        dependencies=dependencies(),
+    )
+    try:
+        resumed_after_reopen = await LangGraphInvestigationRunner(reopened).resume(
+            initial.incident_id
+        )
+    finally:
+        await reopened.aclose()
+
     assert resumed.incident_id == initial.incident_id
     assert resumed.ranked_hypotheses == initial.ranked_hypotheses
+    assert resumed_after_reopen.ranked_hypotheses == initial.ranked_hypotheses

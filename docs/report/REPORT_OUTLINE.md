@@ -1,5 +1,7 @@
 # Project I report outline
 
+The report templates, drafts, and supporting media are in [Report/](../../Report/).
+
 **Working title:** RecoverIT: Autonomous CI/CD Incident Investigation and Evidence-Based Remediation Recommendations
 
 **Format authority:** `BCE497J PROJECT REPORT TEMPLATE.docx` and `BCSE497J_Project_I_Guidelines.pdf`. The report is an individual submission. The written template specifications govern A4 size, 3.81 cm left margin, 2.54 cm top/right/bottom margins, Times New Roman 12 pt body text, 1.5 line spacing, chapter headings at 16 pt bold, section headings at 14 pt uppercase, subsection headings at 12 pt uppercase, bottom-centred Arabic body-page numbers, and APA references. The template's logo and certificate language are retained. Target length: 60–100 pages.

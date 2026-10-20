@@ -7,16 +7,18 @@ service objects or callbacks in graph state.
 
 from __future__ import annotations
 
-from contextlib import AbstractAsyncContextManager, contextmanager
+from contextlib import AbstractAsyncContextManager, asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from enum import StrEnum
 import json
 from pathlib import Path
-from typing import Any, Callable, Iterator, Protocol
+from typing import Any, AsyncIterator, Callable, Iterator, Protocol
 
+import aiosqlite
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, Field, ValidationError
@@ -26,6 +28,40 @@ from contracts.enums import SourceType
 from contracts.errors.schemas import ProgressEvent
 from contracts.incident.schemas import IncidentSeed
 from investigation.graph import GraphDependencies, build_investigation_graph
+
+
+# These are the exact application types stored at the top level of graph state.
+# LangGraph's default permissive deserializer warns when restoring them, and
+# future versions will block unregistered types. Keep this list narrow rather
+# than allowing arbitrary classes from the project's modules.
+CHECKPOINT_ALLOWED_TYPES = (
+    ("contracts.incident.schemas", "IncidentSeed"),
+    ("contracts.collection.schemas", "SourceCapabilityCatalog"),
+    ("contracts.investigation.schemas", "InvestigationBudget"),
+    ("contracts.enums", "InvestigationState"),
+    ("contracts.investigation.schemas", "BudgetUsage"),
+    ("contracts.investigation.schemas", "MissingInformationAssessment"),
+    ("contracts.collection.schemas", "EvidenceQueryPlan"),
+    ("contracts.collection.schemas", "RawEvidenceBatch"),
+    ("contracts.evidence.schemas", "IncidentContextSnapshot"),
+    ("contracts.hypothesis.schemas", "HypothesisSet"),
+    ("contracts.investigation.schemas", "StopDecision"),
+    ("reasoning.stopping", "ExtendedStopDecision"),
+    ("contracts.hypothesis.schemas", "RankedHypothesisSet"),
+    ("contracts.errors.schemas", "StructuredError"),
+    ("contracts.errors.schemas", "ProgressEvent"),
+    ("contracts.remediation.schemas", "RemediationPlan"),
+)
+
+
+@asynccontextmanager
+async def _open_sqlite_checkpointer(path: Path) -> AsyncIterator[AsyncSqliteSaver]:
+    async with aiosqlite.connect(str(path)) as connection:
+        yield AsyncSqliteSaver(connection, serde=_checkpoint_serializer())
+
+
+def _checkpoint_serializer() -> JsonPlusSerializer:
+    return JsonPlusSerializer(allowed_msgpack_modules=CHECKPOINT_ALLOWED_TYPES)
 
 
 class RuntimeMode(StrEnum):
@@ -171,14 +207,14 @@ async def build_runtime(
             )
         registry, dependencies = _build_live_dependencies(settings, dispatcher)
     if settings.mode is RuntimeMode.TEST:
-        checkpointer: BaseCheckpointSaver = InMemorySaver()
+        checkpointer: BaseCheckpointSaver = InMemorySaver(serde=_checkpoint_serializer())
         checkpoint_context: AbstractAsyncContextManager[BaseCheckpointSaver] | None = None
     else:
         path = settings.checkpoint_database_path
         if path is None:
             path = Path(".recoverit") / "checkpoints.sqlite"
         path.parent.mkdir(parents=True, exist_ok=True)
-        checkpoint_context = AsyncSqliteSaver.from_conn_string(str(path))
+        checkpoint_context = _open_sqlite_checkpointer(path)
         checkpointer = await checkpoint_context.__aenter__()
 
     graph_dependencies = GraphDependencies(

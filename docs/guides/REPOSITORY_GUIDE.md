@@ -17,7 +17,7 @@ This is a Python package repository. The top-level folders are **layers in an in
 | `remediation/` | Suggests and validates human-reviewed remediation plans. |
 | `recoverit/` | Wires the pieces together and exposes CLI, API, browser UI, and report output. |
 | `tests/` | Contract, unit, integration, and scenario checks with recorded fixtures. |
-| `docs/`, root `.md` files, `Report/` | Design history, implementation plans, handoffs, examples, and academic report material. They explain the project but are not the runtime path. |
+| `docs/`, `Report/` | Design history, implementation plans, handoffs, examples, and academic report material. They explain the project but are not the runtime path. |
 
 Files named `__init__.py` mark Python packages and often re-export the public names from sibling modules. `schemas.py` usually contains validated Pydantic data models. `ports.py` and `interface.py` define capabilities a component must provide; `memory.py` is a replaceable in-memory implementation. `service.py` usually coordinates work within one subsystem. `test_*.py` checks the behavior named in its filename. macOS `._*` files, `__pycache__/`, `.pytest_cache/`, and `pjtVenv/` are metadata, caches, or local dependencies, not application source.
 
@@ -149,17 +149,7 @@ The list below covers the project's source, tests, fixtures, configuration, and 
 ### Root files
 
 - `.gitignore` — Lists local/generated paths Git should ignore.
-- `ARCHITECTURE.md` — Detailed architecture/design description; some sections are historical, so check code for current behavior.
-- `Autonomous_CICD_Incident_Triager_Self_Healer (1).md` — Earlier project concept and requirements document.
-- `CREDIBILITY_IMPROVEMENT_PLAN.md` — Planned improvements to the credibility of evidence and conclusions.
-- `LANGGRAPH_MIGRATION_AND_TEAM_EXECUTION_PLAN.md` — Plan for migrating orchestration to LangGraph and dividing the work.
-- `PERSON_2_IMPLEMENTATION_PLAN.md` — Implementation assignments for evidence/timeline work.
-- `PERSON_3_IMPLEMENTATION_PLAN.md` — Implementation assignments for investigation/reasoning work.
-- `README.md` — Quick setup, test, run, and folder overview.
-- `REMEDIATION_RECOMMENDATION_IMPLEMENTATION_PLAN.md` — Root-level remediation implementation plan.
-- `REMEDIATION_TWO_PERSON_EXECUTION_PLAN.md` — Two-person plan for remediation work.
-- `WORK_DIVISION.md` — Team responsibilities and integration boundaries.
-- `implementation_plan.md` — Original implementation plan and milestones.
+- `README.md` — Setup, run commands, and a repository map.
 - `pyproject.toml` — Defines package metadata, dependencies, package discovery, and pytest settings.
 - `setup.py` — Filters macOS AppleDouble metadata from Python distribution builds.
 
@@ -309,7 +299,6 @@ The list below covers the project's source, tests, fixtures, configuration, and 
 - `reasoning/hypotheses/generator.py` — Hypothesis generator component.
 - `reasoning/hypotheses/reviser.py` — Hypothesis reviser component.
 - `reasoning/hypotheses/service.py` — Canonical HypothesisService satisfying the frozen graph protocol.
-- `reasoning/prompts_or_strategies/__init__.py` — Marks this directory as a Python package.
 - `reasoning/provider/__init__.py` — Marks this directory as a Python package and re-exports its public types/functions.
 - `reasoning/provider/clients.py` — Concrete live LLM client adapters implementing the LLMClient protocol.
 - `reasoning/provider/fake_provider.py` — TEST-ONLY compatibility shim for FakeReasoningProvider.
@@ -355,7 +344,6 @@ The list below covers the project's source, tests, fixtures, configuration, and 
 - `tests/contract/test_schemas.py` — Checks schemas behavior and edge cases.
 - `tests/contracts/test_remediation_contracts.py` — Checks remediation contracts behavior and edge cases.
 - `tests/evidence/test_context_builder.py` — Checks context builder behavior and edge cases.
-- `tests/fixtures/__init__.py` — Marks this directory as a Python package.
 - `tests/fixtures/application/persisted_log_record.json` — Recorded persisted log record data used by tests.
 - `tests/fixtures/context/phase_8_context_snapshot.json` — Recorded phase 8 context snapshot data used by tests.
 - `tests/fixtures/contracts/evidence_filter.json` — Recorded evidence filter data used by tests.
@@ -374,18 +362,6 @@ The list below covers the project's source, tests, fixtures, configuration, and 
 - `tests/fixtures/contracts/timeline_event.json` — Recorded timeline event data used by tests.
 - `tests/fixtures/normalization/all_sources_batch.json` — Recorded all sources batch data used by tests.
 - `tests/fixtures/normalization/normalized_candidates.json` — Recorded normalized candidates data used by tests.
-- `tests/fixtures/person3/__init__.py` — Marks this directory as a Python package.
-- `tests/fixtures/person3/catalog_default.json` — Recorded catalog default data used by tests.
-- `tests/fixtures/person3/context_database_outage.json` — Recorded context database outage data used by tests.
-- `tests/fixtures/person3/context_deployment_regression.json` — Recorded context deployment regression data used by tests.
-- `tests/fixtures/person3/context_resource_exhaustion.json` — Recorded context resource exhaustion data used by tests.
-- `tests/fixtures/person3/fixture_loader.py` — Loads recorded JSON fixtures for repeatable tests.
-- `tests/fixtures/person3/incident_database_outage.json` — Recorded incident database outage data used by tests.
-- `tests/fixtures/person3/incident_deployment_regression.json` — Recorded incident deployment regression data used by tests.
-- `tests/fixtures/person3/incident_resource_exhaustion.json` — Recorded incident resource exhaustion data used by tests.
-- `tests/fixtures/person3/recorded_database_outage.json` — Recorded recorded database outage data used by tests.
-- `tests/fixtures/person3/recorded_deployment_regression.json` — Recorded recorded deployment regression data used by tests.
-- `tests/fixtures/person3/recorded_resource_exhaustion.json` — Recorded recorded resource exhaustion data used by tests.
 - `tests/fixtures/person3/recorded_session_01.json` — Recorded recorded session 01 data used by tests.
 - `tests/fixtures/replay/phase_9_scenarios.json` — Recorded phase 9 scenarios data used by tests.
 - `tests/fixtures/security/synthetic_secrets.json` — Recorded synthetic secrets data used by tests.
@@ -394,7 +370,6 @@ The list below covers the project's source, tests, fixtures, configuration, and 
 - `tests/graph/test_investigation_graph.py` — Checks investigation graph behavior and edge cases.
 - `tests/graph/test_investigation_graph_remediation.py` — Checks investigation graph remediation behavior and edge cases.
 - `tests/graph/test_remediation_node.py` — Checks remediation node behavior and edge cases.
-- `tests/integration/__init__.py` — Marks this directory as a Python package.
 - `tests/integration/test_configured_entrypoints.py` — Checks configured entrypoints behavior and edge cases.
 - `tests/integration/test_live_web_api.py` — Checks live web api behavior and edge cases.
 - `tests/integration/test_remediation_runner.py` — Checks remediation runner behavior and edge cases.
@@ -414,7 +389,6 @@ The list below covers the project's source, tests, fixtures, configuration, and 
 - `tests/remediation/test_planner.py` — Checks planner behavior and edge cases.
 - `tests/remediation/test_policies.py` — Checks policies behavior and edge cases.
 - `tests/repository_contract.py` — Reusable behavior checks that repository implementations must pass.
-- `tests/scenarios/__init__.py` — Marks this directory as a Python package.
 - `tests/support/__init__.py` — Marks this directory as a Python package and re-exports its public types/functions.
 - `tests/support/scripted_reasoning_provider.py` — Support code for test scenarios.
 - `tests/support/scripted_remediation_planner.py` — Support code for test scenarios.
@@ -436,30 +410,45 @@ The list below covers the project's source, tests, fixtures, configuration, and 
 
 ### Project documentation (`docs/`)
 
-- `docs/CLEANUP_AUDIT.md` — Guide or project history for cleanup audit.
-- `docs/CONTRACT_COMPATIBILITY.md` — Guide or project history for contract compatibility.
-- `docs/PHASE_1_TESTING.md` — Guide or project history for phase 1 testing.
-- `docs/PHASE_2_REPOSITORIES.md` — Guide or project history for phase 2 repositories.
-- `docs/PHASE_3_NORMALIZATION.md` — Guide or project history for phase 3 normalization.
-- `docs/PHASE_4_SECURITY.md` — Guide or project history for phase 4 security.
-- `docs/PHASE_5_DEDUPLICATION.md` — Guide or project history for phase 5 deduplication.
-- `docs/PHASE_6_EVIDENCE_PROCESSING.md` — Guide or project history for phase 6 evidence processing.
-- `docs/PHASE_7_TIMELINE.md` — Guide or project history for phase 7 timeline.
-- `docs/PHASE_8_CONTEXT.md` — Guide or project history for phase 8 context.
-- `docs/PHASE_9_HANDOFF.md` — Guide or project history for phase 9 handoff.
-- `docs/REMEDIATION_RECOMMENDATION_IMPLEMENTATION_PLAN.md` — Guide or project history for remediation recommendation implementation plan.
-- `docs/TEAM_SETUP_AND_LIVE_RUN.md` — Guide or project history for team setup and live run.
-- `docs/__init__.py` — Marks this directory as a Python package.
-- `docs/contract-change-requests/PERSON_1.md` — Contract change request notes for person 1.
-- `docs/contract-change-requests/PERSON_2.md` — Contract change request notes for person 2.
-- `docs/contract-change-requests/PERSON_3.md` — Contract change request notes for person 3.
-- `docs/contract-change-requests/README.md` — Contract change request notes for readme.
-- `docs/handoffs/PERSON_1_REMEDIATION_HANDOFF.md` — Team handoff notes for person 1 remediation handoff.
-- `docs/handoffs/PERSON_2_HANDOFF.md` — Team handoff notes for person 2 handoff.
-- `docs/handoffs/PERSON_2_REMEDIATION_HANDOFF.md` — Team handoff notes for person 2 remediation handoff.
-- `docs/handoffs/PERSON_3_HANDOFF.md` — Team handoff notes for person 3 handoff.
+The [documentation index](../INDEX.md) groups these files by purpose.
+
+- `docs/._INDEX.md` — Project documentation.
+- `docs/INDEX.md` — Project documentation.
+- `docs/architecture/ARCHITECTURE.md` — Project documentation.
+- `docs/architecture/Autonomous_CICD_Incident_Triager_Self_Healer (1).md` — Project documentation.
+- `docs/contract-change-requests/PERSON_1.md` — Project documentation.
+- `docs/contract-change-requests/PERSON_2.md` — Project documentation.
+- `docs/contract-change-requests/PERSON_3.md` — Project documentation.
+- `docs/contract-change-requests/README.md` — Project documentation.
+- `docs/guides/._REPOSITORY_GUIDE.md` — Project documentation.
+- `docs/guides/CLEANUP_AUDIT.md` — Project documentation.
+- `docs/guides/CONTRACT_COMPATIBILITY.md` — Project documentation.
+- `docs/guides/REPOSITORY_GUIDE.md` — Project documentation.
+- `docs/guides/TEAM_SETUP_AND_LIVE_RUN.md` — Project documentation.
+- `docs/guides/integration-guide.md` — Project documentation.
+- `docs/handoffs/PERSON_1_REMEDIATION_HANDOFF.md` — Project documentation.
+- `docs/handoffs/PERSON_2_HANDOFF.md` — Project documentation.
+- `docs/handoffs/PERSON_2_REMEDIATION_HANDOFF.md` — Project documentation.
+- `docs/handoffs/PERSON_3_HANDOFF.md` — Project documentation.
+- `docs/phases/PHASE_1_TESTING.md` — Project documentation.
+- `docs/phases/PHASE_2_REPOSITORIES.md` — Project documentation.
+- `docs/phases/PHASE_3_NORMALIZATION.md` — Project documentation.
+- `docs/phases/PHASE_4_SECURITY.md` — Project documentation.
+- `docs/phases/PHASE_5_DEDUPLICATION.md` — Project documentation.
+- `docs/phases/PHASE_6_EVIDENCE_PROCESSING.md` — Project documentation.
+- `docs/phases/PHASE_7_TIMELINE.md` — Project documentation.
+- `docs/phases/PHASE_8_CONTEXT.md` — Project documentation.
+- `docs/phases/PHASE_9_HANDOFF.md` — Project documentation.
+- `docs/plans/CREDIBILITY_IMPROVEMENT_PLAN.md` — Project documentation.
+- `docs/plans/LANGGRAPH_MIGRATION_AND_TEAM_EXECUTION_PLAN.md` — Project documentation.
+- `docs/plans/PERSON_2_IMPLEMENTATION_PLAN.md` — Project documentation.
+- `docs/plans/PERSON_3_IMPLEMENTATION_PLAN.md` — Project documentation.
+- `docs/plans/REMEDIATION_RECOMMENDATION_IMPLEMENTATION_PLAN.md` — Project documentation.
+- `docs/plans/REMEDIATION_TWO_PERSON_EXECUTION_PLAN.md` — Project documentation.
+- `docs/plans/WORK_DIVISION.md` — Project documentation.
+- `docs/plans/implementation_plan.md` — Project documentation.
+- `docs/report/REPORT_OUTLINE.md` — Project documentation.
 - `docs/incident.example.json` — Example incident input for a configured investigation.
-- `docs/integration-guide.md` — Guide or project history for integration-guide.
 - `docs/live-runtime.example.json` — Example source, provider, and checkpoint configuration.
 
 ### Report and presentation material (`Report/`)
@@ -474,7 +463,6 @@ The list below covers the project's source, tests, fixtures, configuration, and 
 - `Report/CHAPTER 1.docx` — Editable report/reference document: CHAPTER 1.
 - `Report/Integrated CICD Incident Triager.pdf` — PDF report/reference: Integrated CICD Incident Triager.
 - `Report/Literature Reviews.pdf` — PDF report/reference: Literature Reviews.
-- `Report/REPORT_OUTLINE.md` — Outline for the written project report.
 - `Report/RecoverIT Project I Presentation - Updated.pptx` — Presentation deck: RecoverIT Project I Presentation - Updated.
 - `Report/RecoverIT Project I Presentation.pptx` — Presentation deck: RecoverIT Project I Presentation.
 - `Report/RecoverIT Report II Team Revision II.docx` — Editable report/reference document: RecoverIT Report II Team Revision II.
